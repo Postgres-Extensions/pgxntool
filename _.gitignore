@@ -1,6 +1,9 @@
 # Editor files
 .*.swp
 
+# Claude Code local settings
+.claude/*.local.json
+
 # Explicitly exclude META.json!
 !/META.json
 
