@@ -90,7 +90,8 @@ for ext in $provides; do
   echo "EXTENSION_${ext}_VERSION_FILE	= sql/${ext}--\$(EXTENSION_${ext}_VERSION).sql"
   echo "EXTENSION_VERSION_FILES		+= \$(EXTENSION_${ext}_VERSION_FILE)"
   echo "\$(EXTENSION_${ext}_VERSION_FILE): sql/${ext}.sql META.json meta.mk"
-  echo '	cp $< $@'
+  echo "	@echo '/* DO NOT EDIT - AUTO-GENERATED FILE */' > \$(EXTENSION_${ext}_VERSION_FILE)"
+  echo "	@cat sql/${ext}.sql >> \$(EXTENSION_${ext}_VERSION_FILE)"
 done
 
 # vi: expandtab ts=2 sw=2

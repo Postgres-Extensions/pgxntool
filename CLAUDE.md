@@ -112,6 +112,9 @@ make results           # Run tests and update expected output files
 make html              # Generate HTML from Asciidoc sources
 make tag               # Create git branch for current META.json version
 make dist              # Create PGXN .zip (auto-tags, places in ../)
+make pgtle             # Generate pg_tle registration SQL (see pg_tle Support below)
+make check-pgtle       # Check pg_tle installation and report version
+make install-pgtle    # Install pg_tle registration SQL files into database
 make pgxntool-sync     # Update to latest pgxntool via git subtree pull
 ```
 
@@ -185,6 +188,56 @@ When modifying pgxntool:
 - Multiple sync targets: release, stable, local variants
 - Uses `git subtree pull --squash`
 - Requires clean repo (no uncommitted changes)
+
+### pg_tle Support
+
+pgxntool can generate pg_tle (Trusted Language Extensions) registration SQL for deploying extensions in AWS RDS/Aurora without filesystem access.
+
+**Usage:** `make pgtle` or `make pgtle PGTLE_VERSION=1.5.0+`
+
+**Output:** `pg_tle/{version_range}/{extension}.sql`
+
+**Version ranges:**
+- `1.0.0-1.5.0` - pg_tle 1.0.0 through 1.4.x (no schema parameter)
+- `1.5.0+` - pg_tle 1.5.0 and later (schema parameter support)
+
+**Installation targets:**
+
+- `make check-pgtle` - Checks if pg_tle is installed and reports the version. Reports version from `pg_extension` if extension has been created, or newest available version from `pg_available_extension_versions` if available but not created. Errors if pg_tle not available in cluster. Assumes `PG*` environment variables are configured.
+
+- `make install-pgtle` - Auto-detects pg_tle version and installs appropriate registration SQL files. Updates or creates pg_tle extension as needed. Determines which version range files to install based on detected version. Runs all generated SQL files via `psql` to register extensions with pg_tle. Assumes `PG*` environment variables are configured.
+
+**Version notation:**
+- `X.Y.Z+` means >= X.Y.Z
+- `X.Y.Z-A.B.C` means >= X.Y.Z and < A.B.C (note boundary)
+
+**Key implementation details:**
+- Script: `pgxntool/pgtle-wrap.sh` (bash)
+- Parses `.control` files for metadata (NOT META.json)
+- Fixed delimiter: `$_pgtle_wrap_delimiter_$` (validated not in source)
+- Each output file contains ALL versions and ALL upgrade paths
+- Multi-extension support (multiple .control files)
+- Output directory `pg_tle/` excluded from git
+- Depends on `make all` to ensure versioned SQL files exist first
+- Only processes versioned files (`sql/{ext}--{version}.sql`), not base files
+
+**SQL file handling:**
+- **Version files** (`sql/{ext}--{version}.sql`): Generated automatically by `make all` from base `sql/{ext}.sql` file
+- **Upgrade scripts** (`sql/{ext}--{v1}--{v2}.sql`): Created manually by users when adding new extension versions
+- The script ensures the default_version file exists if the base file exists (creates it from base file if missing)
+- All version files and upgrade scripts are discovered and included in the generated pg_tle registration SQL
+
+**Dependencies:**
+Generated files depend on:
+- Control file (metadata source)
+- All SQL files (sql/{ext}--*.sql) - must run `make all` first
+- Generator script itself
+
+**Limitations:**
+- No C code support (pg_tle requires trusted languages only)
+- PostgreSQL 14.5+ required (pg_tle not available on earlier versions)
+
+See `README-pgtle.md` for complete user documentation.
 
 ## Critical Gotchas
 

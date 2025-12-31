@@ -48,7 +48,7 @@ ifeq ($(strip $(MODULES)),)
 MODULES =# Set to NUL so PGXS doesn't puke
 endif
 
-EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) $(EXTENSION_VERSION_FILES) $(TEST_SQL_FROM_SOURCE) $(TEST_EXPECTED_FROM_SOURCE)
+EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) $(TEST_SQL_FROM_SOURCE) $(TEST_EXPECTED_FROM_SOURCE) pg_tle/
 
 # Get Postgres version, as well as major (9.4, etc) version.
 # NOTE! In at least some versions, PGXS defines VERSION, so we intentionally don't use that variable
@@ -119,6 +119,107 @@ results: test
 # testdeps is a generic dependency target that you can add targets to
 .PHONY: testdeps
 testdeps: pgtap
+
+#
+# pg_tle support - Generate pg_tle registration SQL
+#
+
+# User-configurable: specific pg_tle version to generate
+# Leave empty to generate all versions (default)
+# Example: make pgtle PGTLE_VERSION=1.5.0+
+PGTLE_VERSION ?=
+
+# pg_tle version ranges we support
+# These correspond to different capability levels
+PGTLE_VERSION_RANGES = 1.0.0-1.5.0 1.5.0+
+
+# pg_tle version subdirectories
+PGTLE_1_0_TO_1_5_DIR = pg_tle/1.0.0-1.5.0
+PGTLE_1_5_PLUS_DIR = pg_tle/1.5.0+
+
+# Discover all extensions from control files in current directory
+PGXNTOOL_CONTROL_FILES = $(wildcard *.control)
+PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
+
+# Generate list of pg_tle output files
+# If PGTLE_VERSION is set, generate only that version
+# Otherwise, generate all version ranges
+ifeq ($(PGTLE_VERSION),)
+    # Generate all versions (default)
+    PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+                    $(PGTLE_1_0_TO_1_5_DIR)/$(ext).sql \
+                    $(PGTLE_1_5_PLUS_DIR)/$(ext).sql)
+else
+    # Generate only specified version
+    ifeq ($(PGTLE_VERSION),1.0.0-1.5.0)
+        PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+                        $(PGTLE_1_0_TO_1_5_DIR)/$(ext).sql)
+    else ifeq ($(PGTLE_VERSION),1.5.0+)
+        PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+                        $(PGTLE_1_5_PLUS_DIR)/$(ext).sql)
+    else
+        $(error Invalid PGTLE_VERSION: $(PGTLE_VERSION). Use 1.0.0-1.5.0 or 1.5.0+)
+    endif
+endif
+
+# Main target
+# Depend on 'all' to ensure versioned SQL files are generated first
+# Depend on meta.mk (which defines EXTENSION_VERSION_FILES) and versioned SQL files
+# to ensure they're generated first
+# Depend on control files explicitly so changes trigger rebuilds
+.PHONY: pgtle
+pgtle: all meta.mk $(PGXNTOOL_CONTROL_FILES) $(PGTLE_FILES)
+
+# Enable secondary expansion for dynamic dependencies
+.SECONDEXPANSION:
+
+# Pattern rule for generating pg_tle 1.0.0-1.5.0 files
+# Dependencies:
+#   - Control file (metadata source)
+#   - Generator script (tool itself)
+#   - All SQL files for this extension (using secondary expansion)
+# Note: We depend on $(EXTENSION_VERSION_FILES) at the pgtle target level
+# to ensure all versioned files exist before pattern rules run
+$(PGTLE_1_0_TO_1_5_DIR)/%.sql: %.control $(PGXNTOOL_DIR)/pgtle.sh $$(wildcard sql/$$*--*.sql) $$(wildcard sql/$$*.sql)
+	@mkdir -p $(PGTLE_1_0_TO_1_5_DIR)
+	@$(PGXNTOOL_DIR)/pgtle.sh \
+		--extension $(basename $<) \
+		--pgtle-version 1.0.0-1.5.0
+
+# Pattern rule for generating pg_tle 1.5.0+ files
+$(PGTLE_1_5_PLUS_DIR)/%.sql: %.control $(PGXNTOOL_DIR)/pgtle.sh $$(wildcard sql/$$*--*.sql) $$(wildcard sql/$$*.sql)
+	@mkdir -p $(PGTLE_1_5_PLUS_DIR)
+	@$(PGXNTOOL_DIR)/pgtle.sh \
+		--extension $(basename $<) \
+		--pgtle-version 1.5.0+
+
+#
+# pg_tle installation support
+#
+
+# Check if pg_tle is installed and report version
+# Only reports version if CREATE EXTENSION pg_tle has been run
+# Errors if pg_tle extension is not installed
+# Uses pgtle.sh to get version (avoids code duplication)
+.PHONY: check-pgtle
+check-pgtle:
+	@echo "Checking pg_tle installation..."
+	@PGTLE_VERSION=$$($(PGXNTOOL_DIR)/pgtle.sh --get-version 2>/dev/null); \
+	if [ -n "$$PGTLE_VERSION" ]; then \
+		echo "pg_tle extension version: $$PGTLE_VERSION"; \
+		exit 0; \
+	fi; \
+	echo "ERROR: pg_tle extension is not installed" >&2; \
+	echo "       Run 'CREATE EXTENSION pg_tle;' first" >&2; \
+	exit 1
+
+# Run pg_tle registration SQL files
+# Requires pg_tle extension to be installed (checked via check-pgtle)
+# Uses pgtle.sh to determine which version range directory to use
+# Assumes PG* environment variables are configured
+.PHONY: run-pgtle
+run-pgtle: pgtle
+	@$(PGXNTOOL_DIR)/pgtle.sh --run
 
 # These targets ensure all the relevant directories exist
 $(TESTDIR)/sql $(TESTDIR)/expected/ $(TESTOUT)/results/:
