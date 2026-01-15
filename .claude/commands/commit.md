@@ -1,1 +1,0 @@
-../../../pgxntool-test/.claude/commands/commit.md
