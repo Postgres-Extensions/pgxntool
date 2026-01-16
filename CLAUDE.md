@@ -30,31 +30,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Workflow: Work from pgxntool-test
 
-**CRITICAL**: All development work on pgxntool should be done from the `../pgxntool-test/` repository, NOT from this repository.
+**CRITICAL**: All development work on pgxntool should be done from the pgxntool-test repository, NOT from this repository.
 
-**Why?** Because:
-- This repository contains ONLY the framework files that get embedded into extension projects
-- All development tools, test infrastructure, and convenience scripts live in `../pgxntool-test/`
-- Adding development tools here would pollute every extension project that uses pgxntool
-
-**What this means**:
-- Clone and work from `../pgxntool-test/` when developing pgxntool
-- Edit files in `../pgxntool/` but run all commands from `../pgxntool-test/`
-- All testing, documentation of testing, and development utilities belong in pgxntool-test
+**For complete development workflow documentation, see:**
+https://github.com/Postgres-Extensions/pgxntool-test
 
 ## Two-Repository Development Pattern
 
-This codebase uses a two-repository testing pattern:
+This codebase uses a two-repository pattern:
 
 1. **pgxntool/** (this repo) - The framework code that gets embedded into extension projects
-2. **../pgxntool-test/** - The test harness that creates test repositories, exercises pgxntool's functionality, and validates outputs
+2. **pgxntool-test** - The test harness that validates pgxntool functionality
 
-The test harness contains template extension files in `../pgxntool-test/template/` which are used to create fresh test repositories.
-
-**To test changes to pgxntool**, you must:
-1. Ensure changes are visible to pgxntool-test (via git commit or using the rsync mechanism in the test harness)
-2. Run tests from `../pgxntool-test/`
-3. The test harness will create a fresh test repository from the template, sync in pgxntool changes, and validate behavior
+**For development and testing workflow, see:**
+https://github.com/Postgres-Extensions/pgxntool-test
 
 ## How Extension Developers Use pgxntool
 
@@ -147,7 +136,11 @@ make pgxntool-sync     # Update to latest pgxntool via git subtree pull
 
 **Database Connection Requirement**: PostgreSQL must be running before executing `make test`. If you get connection errors (e.g., "could not connect to server"), stop and ask the user to start PostgreSQL.
 
-**Claude Code MUST NEVER run `make results`**. This target updates test expected output files and requires manual human verification of test changes before execution. The workflow is:
+**Claude Code MUST NEVER run `make results`**. This target updates test expected output files and requires manual human verification of test changes before execution.
+
+**Claude Code MUST NEVER modify files in `test/expected/`**. These are expected test outputs that define correct behavior and must only be updated through the `make results` workflow.
+
+The workflow is:
 1. Human runs `make test` and examines diffs
 2. Human manually verifies changes are correct
 3. Human manually runs `make results` to update expected files
@@ -157,23 +150,10 @@ make pgxntool-sync     # Update to latest pgxntool via git subtree pull
 pgxntool uses PostgreSQL's pg_regress test framework:
 - **Actual test output**: Written to `test/results/` directory
 - **Expected output**: Stored in `test/expected/` directory
-- **Test comparison**: `make test` compares actual vs expected and shows diffs
+- **Test comparison**: pg_regress compares actual vs expected and generates diffs; `make test` displays them
 - **Updating expectations**: `make results` copies `test/results/` → `test/expected/`
 
 When tests fail, examine the diff output carefully. The actual test output in `test/results/` shows what your code produced, while `test/expected/` shows what was expected.
-
-## Development Workflow (for pgxntool Contributors)
-
-When modifying pgxntool:
-
-1. **Make changes** in this repo (pgxntool/)
-2. **Test changes** by running `make test` in `../pgxntool-test/`
-   - The test harness creates a fresh test repository from `../pgxntool-test/template/`
-   - If pgxntool is dirty, it rsyncs your uncommitted changes
-   - Runs setup, builds, tests, and validates outputs
-3. **Examine results** in `../pgxntool-test/results/` and `../pgxntool-test/diffs/`
-4. **Update expected outputs** if needed: `make sync-expected` in `../pgxntool-test/`
-5. **Commit changes** once tests pass
 
 ## Key Implementation Details
 
@@ -185,7 +165,7 @@ When modifying pgxntool:
 ### Test System (pg_regress based)
 - Tests in `test/sql/*.sql`, outputs compared to `test/expected/*.out`
 - Setup via `test/pgxntool/setup.sql` (loads pgTap and deps.sql)
-- `.IGNORE: installcheck` prevents build failures on test errors
+- `.IGNORE: installcheck` allows `make test` to handle errors (show diffs, then exit with error status)
 - `make results` updates expected outputs after test runs
 
 ### Document Generation
@@ -214,9 +194,7 @@ pgxntool can generate pg_tle (Trusted Language Extensions) registration SQL for 
 
 **Output:** `pg_tle/{version_range}/{extension}.sql`
 
-**Version ranges:**
-- `1.0.0-1.5.0` - pg_tle 1.0.0 through 1.4.x (no schema parameter)
-- `1.5.0+` - pg_tle 1.5.0 and later (schema parameter support)
+**For version range details and API compatibility boundaries, see:** `pgtle_versions.md`
 
 **Installation targets:**
 
@@ -254,8 +232,6 @@ Generated files depend on:
 - No C code support (pg_tle requires trusted languages only)
 - PostgreSQL 14.5+ required (pg_tle not available on earlier versions)
 
-See `README-pgtle.md` for complete user documentation.
-
 ## Critical Gotchas
 
 1. **Empty Variables**: If `DOCS` or `MODULES` is empty, base.mk sets to empty to prevent PGXS errors
@@ -275,5 +251,5 @@ See `README-pgtle.md` for complete user documentation.
 
 ## Related Repositories
 
-- **../pgxntool-test/** - Test harness for validating pgxntool functionality (includes template extension files in `template/` directory)
+- **pgxntool-test** - Test harness for validating pgxntool functionality: https://github.com/Postgres-Extensions/pgxntool-test
 - Never produce any kind of metrics or estimates unless you have data to back them up. If you do have data you MUST reference it.

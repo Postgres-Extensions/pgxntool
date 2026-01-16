@@ -30,17 +30,18 @@ ASCIIDOC_FILES	+= $(foreach dir,$(DOC_DIRS),$(foreach ext,$(ASCIIDOC_EXTS),$(wil
 PG_CONFIG   ?= pg_config
 TESTDIR		?= test
 TESTOUT		?= $(TESTDIR)
-TEST_SOURCE_FILES	+= $(wildcard $(TESTDIR)/input/*.source)
-TEST_OUT_SOURCE_FILES	+= $(wildcard $(TESTDIR)/output/*.source)
-TEST_OUT_FILES		 = $(subst input,output,$(TEST_SOURCE_FILES))
+# .source files are OPTIONAL - see "pg_regress workflow" comment below for details
+TEST__SOURCE__INPUT_FILES	+= $(wildcard $(TESTDIR)/input/*.source)
+TEST__SOURCE__OUTPUT_FILES	+= $(wildcard $(TESTDIR)/output/*.source)
+TEST__SOURCE__INPUT_AS_OUTPUT		 = $(subst input,output,$(TEST__SOURCE__INPUT_FILES))
 TEST_SQL_FILES		+= $(wildcard $(TESTDIR)/sql/*.sql)
 TEST_RESULT_FILES	 = $(patsubst $(TESTDIR)/sql/%.sql,$(TESTDIR)/expected/%.out,$(TEST_SQL_FILES))
-TEST_FILES	 = $(TEST_SOURCE_FILES) $(TEST_SQL_FILES)
+TEST_FILES	 = $(TEST__SOURCE__INPUT_FILES) $(TEST_SQL_FILES)
 # Ephemeral files generated from source files (should be cleaned)
 # input/*.source → sql/*.sql (converted by pg_regress)
-TEST_SQL_FROM_SOURCE	 = $(patsubst $(TESTDIR)/input/%.source,$(TESTDIR)/sql/%.sql,$(TEST_SOURCE_FILES))
+TEST__SOURCE__SQL_FILES	 = $(patsubst $(TESTDIR)/input/%.source,$(TESTDIR)/sql/%.sql,$(TEST__SOURCE__INPUT_FILES))
 # output/*.source → expected/*.out (converted by pg_regress)
-TEST_EXPECTED_FROM_SOURCE = $(patsubst $(TESTDIR)/output/%.source,$(TESTDIR)/expected/%.out,$(TEST_OUT_SOURCE_FILES))
+TEST__SOURCE__EXPECTED_FILES = $(patsubst $(TESTDIR)/output/%.source,$(TESTDIR)/expected/%.out,$(TEST__SOURCE__OUTPUT_FILES))
 REGRESS		 = $(sort $(notdir $(subst .source,,$(TEST_FILES:.sql=)))) # Sort is to get unique list
 REGRESS_OPTS = --inputdir=$(TESTDIR) --outputdir=$(TESTOUT) # See additional setup below
 MODULES      = $(patsubst %.c,%,$(wildcard src/*.c))
@@ -48,7 +49,7 @@ ifeq ($(strip $(MODULES)),)
 MODULES =# Set to NUL so PGXS doesn't puke
 endif
 
-EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) $(TEST_SQL_FROM_SOURCE) $(TEST_EXPECTED_FROM_SOURCE) pg_tle/
+EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) $(TEST__SOURCE__SQL_FILES) $(TEST__SOURCE__EXPECTED_FILES) pg_tle/
 
 # Get Postgres version, as well as major (9.4, etc) version.
 # NOTE! In at least some versions, PGXS defines VERSION, so we intentionally don't use that variable
@@ -76,7 +77,7 @@ DATA += $(wildcard *.control)
 
 # Don't have installcheck bomb on error
 .IGNORE: installcheck
-installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) $(TEST_SOURCE_FILES) | $(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/
+installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) $(TEST__SOURCE__INPUT_FILES) | $(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/
 
 #
 # TEST SUPPORT
@@ -124,86 +125,19 @@ testdeps: pgtap
 # pg_tle support - Generate pg_tle registration SQL
 #
 
-# User-configurable: specific pg_tle version to generate
-# Leave empty to generate all versions (default)
-# Example: make pgtle PGTLE_VERSION=1.5.0+
-PGTLE_VERSION ?=
-
-# pg_tle version ranges we support
-# These correspond to different capability levels
-PGTLE_VERSION_RANGES = 1.0.0-1.4.0 1.4.0-1.5.0 1.5.0+
-
-# pg_tle version subdirectories
-PGTLE_1_0_TO_1_4_DIR = pg_tle/1.0.0-1.4.0
-PGTLE_1_4_TO_1_5_DIR = pg_tle/1.4.0-1.5.0
-PGTLE_1_5_PLUS_DIR = pg_tle/1.5.0+
-
 # Discover all extensions from control files in current directory
 PGXNTOOL_CONTROL_FILES = $(wildcard *.control)
 PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
 
-# Generate list of pg_tle output files
-# If PGTLE_VERSION is set, generate only that version
-# Otherwise, generate all version ranges
-ifeq ($(PGTLE_VERSION),)
-    # Generate all versions (default)
-    PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
-                    $(PGTLE_1_0_TO_1_4_DIR)/$(ext).sql \
-                    $(PGTLE_1_4_TO_1_5_DIR)/$(ext).sql \
-                    $(PGTLE_1_5_PLUS_DIR)/$(ext).sql)
-else
-    # Generate only specified version
-    ifeq ($(PGTLE_VERSION),1.0.0-1.4.0)
-        PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
-                        $(PGTLE_1_0_TO_1_4_DIR)/$(ext).sql)
-    else ifeq ($(PGTLE_VERSION),1.4.0-1.5.0)
-        PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
-                        $(PGTLE_1_4_TO_1_5_DIR)/$(ext).sql)
-    else ifeq ($(PGTLE_VERSION),1.5.0+)
-        PGTLE_FILES = $(foreach ext,$(PGXNTOOL_EXTENSIONS),\
-                        $(PGTLE_1_5_PLUS_DIR)/$(ext).sql)
-    else
-        $(error Invalid PGTLE_VERSION: $(PGTLE_VERSION). Use 1.0.0-1.4.0, 1.4.0-1.5.0, or 1.5.0+)
-    endif
-endif
-
 # Main target
 # Depend on 'all' to ensure versioned SQL files are generated first
-# Depend on meta.mk (which defines EXTENSION_VERSION_FILES) and versioned SQL files
-# to ensure they're generated first
+# Depend on meta.mk (which defines EXTENSION_VERSION_FILES)
 # Depend on control files explicitly so changes trigger rebuilds
+# Generates all supported pg_tle versions for each extension
 .PHONY: pgtle
-pgtle: all meta.mk $(PGXNTOOL_CONTROL_FILES) $(PGTLE_FILES)
-
-# Enable secondary expansion for dynamic dependencies
-.SECONDEXPANSION:
-
-# Pattern rule for generating pg_tle 1.0.0-1.4.0 files
-# Dependencies:
-#   - Control file (metadata source)
-#   - Generator script (tool itself)
-#   - All SQL files for this extension (using secondary expansion)
-# Note: We depend on $(EXTENSION_VERSION_FILES) at the pgtle target level
-# to ensure all versioned files exist before pattern rules run
-$(PGTLE_1_0_TO_1_4_DIR)/%.sql: %.control $(PGXNTOOL_DIR)/pgtle.sh $$(wildcard sql/$$*--*.sql) $$(wildcard sql/$$*.sql)
-	@mkdir -p $(PGTLE_1_0_TO_1_4_DIR)
-	@$(PGXNTOOL_DIR)/pgtle.sh \
-		--extension $(basename $<) \
-		--pgtle-version 1.0.0-1.4.0
-
-# Pattern rule for generating pg_tle 1.4.0-1.5.0 files
-$(PGTLE_1_4_TO_1_5_DIR)/%.sql: %.control $(PGXNTOOL_DIR)/pgtle.sh $$(wildcard sql/$$*--*.sql) $$(wildcard sql/$$*.sql)
-	@mkdir -p $(PGTLE_1_4_TO_1_5_DIR)
-	@$(PGXNTOOL_DIR)/pgtle.sh \
-		--extension $(basename $<) \
-		--pgtle-version 1.4.0-1.5.0
-
-# Pattern rule for generating pg_tle 1.5.0+ files
-$(PGTLE_1_5_PLUS_DIR)/%.sql: %.control $(PGXNTOOL_DIR)/pgtle.sh $$(wildcard sql/$$*--*.sql) $$(wildcard sql/$$*.sql)
-	@mkdir -p $(PGTLE_1_5_PLUS_DIR)
-	@$(PGXNTOOL_DIR)/pgtle.sh \
-		--extension $(basename $<) \
-		--pgtle-version 1.5.0+
+pgtle: all meta.mk $(PGXNTOOL_CONTROL_FILES)
+	@$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext);)
 
 #
 # pg_tle installation support

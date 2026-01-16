@@ -1,7 +1,6 @@
 .gitattributes export-ignore
 .claude/ export-ignore
-CLAUDE.md export-ignore
-PLAN-*.md export-ignore
+*.md export-ignore
 .DS_Store export-ignore
 *.asc export-ignore
 *.adoc export-ignore
