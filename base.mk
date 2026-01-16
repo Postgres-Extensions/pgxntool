@@ -219,14 +219,23 @@ docclean:
 #
 rmtag:
 	git fetch origin # Update our remotes
-	@test -z "$$(git branch --list $(PGXNVERSION))" || git branch -d $(PGXNVERSION)
-	@test -z "$$(git branch --list -r origin/$(PGXNVERSION))" || git push --delete origin $(PGXNVERSION)
+	@test -z "$$(git tag --list $(PGXNVERSION))" || git tag -d $(PGXNVERSION)
+	@test -z "$$(git ls-remote --tags origin $(PGXNVERSION) | grep -v '{}')" || git push --delete origin $(PGXNVERSION)
 
-# TODO: Don't puke if tag already exists *and is the same*
 tag:
 	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
-	git branch $(PGXNVERSION)
-	git push --set-upstream origin $(PGXNVERSION)
+	@# Skip if tag already exists and points to HEAD
+	@if git rev-parse $(PGXNVERSION) >/dev/null 2>&1; then \
+		if [ "$$(git rev-parse $(PGXNVERSION))" = "$$(git rev-parse HEAD)" ]; then \
+			echo "Tag $(PGXNVERSION) already exists at HEAD, skipping"; \
+		else \
+			echo "ERROR: Tag $(PGXNVERSION) exists but points to different commit" >&2; \
+			exit 1; \
+		fi; \
+	else \
+		git tag $(PGXNVERSION); \
+	fi
+	git push origin $(PGXNVERSION)
 
 .PHONY: forcetag
 forcetag: rmtag tag
