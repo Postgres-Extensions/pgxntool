@@ -456,16 +456,39 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_tag">4.5. tag</a></li>
 <li><a href="#_dist">4.6. dist</a></li>
 <li><a href="#_pgxntool_sync">4.7. pgxntool-sync</a></li>
+<li><a href="#_pgtle">4.8. pgtle</a></li>
+<li><a href="#_check_pgtle">4.9. check-pgtle</a></li>
+<li><a href="#_run_pgtle">4.10. run-pgtle</a></li>
 </ul>
 </li>
-<li><a href="#_document_handling">5. Document Handling</a>
+<li><a href="#_version_specific_sql_files">5. Version-Specific SQL Files</a>
 <ul class="sectlevel2">
-<li><a href="#_document_variables">5.1. Document Variables</a></li>
-<li><a href="#_document_rules">5.2. Document Rules</a></li>
-<li><a href="#_the_docs_variable">5.3. The DOCS variable</a></li>
+<li><a href="#_how_version_files_are_generated">5.1. How Version Files Are Generated</a></li>
+<li><a href="#_what_controls_the_version_number">5.2. What Controls the Version Number</a></li>
+<li><a href="#_committing_version_files">5.3. Committing Version Files</a></li>
+<li><a href="#_alternative_ignoring_version_files">5.4. Alternative: Ignoring Version Files</a></li>
+<li><a href="#_distribution_inclusion">5.5. Distribution Inclusion</a></li>
+<li><a href="#_multiple_versions">5.6. Multiple Versions</a></li>
 </ul>
 </li>
-<li><a href="#_copyright">6. Copyright</a></li>
+<li><a href="#_document_handling">6. Document Handling</a>
+<ul class="sectlevel2">
+<li><a href="#_document_variables">6.1. Document Variables</a></li>
+<li><a href="#_document_rules">6.2. Document Rules</a></li>
+<li><a href="#_the_docs_variable">6.3. The DOCS variable</a></li>
+</ul>
+</li>
+<li><a href="#_pg_tle_support">7. pg_tle Support</a>
+<ul class="sectlevel2">
+<li><a href="#_what_is_pg_tle">7.1. What is pg_tle?</a></li>
+<li><a href="#_quick_start">7.2. Quick Start</a></li>
+<li><a href="#_version_groupings">7.3. Version Groupings</a></li>
+<li><a href="#_installation_example">7.4. Installation Example</a></li>
+<li><a href="#_advanced_usage">7.5. Advanced Usage</a></li>
+<li><a href="#_how_it_works">7.6. How It Works</a></li>
+<li><a href="#_troubleshooting">7.7. Troubleshooting</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -717,10 +740,204 @@ There is also a <code>pgxntool-sync-%</code> rule if you need to do more advance
 </table>
 </div>
 </div>
+<div class="sect2">
+<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.8. pgtle</a></h3>
+<div class="paragraph">
+<p>Generates pg_tle (Trusted Language Extensions) registration SQL files for deploying extensions in managed environments like AWS RDS/Aurora. See <a href="#_pg_tle_Support">[_pg_tle_Support]</a> for complete documentation.</p>
+</div>
+<div class="paragraph">
+<p><code>make pgtle</code> generates SQL files in <code>pg_tle/</code> subdirectories organized by pg_tle version ranges. For version range details, see <code>pgtle_versions.md</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.9. check-pgtle</a></h3>
+<div class="paragraph">
+<p>Checks if pg_tle is installed and reports the version. This target:
+- Reports the version from <code>pg_extension</code> if <code>CREATE EXTENSION pg_tle</code> has been run in the database
+- Errors if pg_tle is not available in the cluster</p>
+</div>
+<div class="paragraph">
+<p>This target assumes <code>PG*</code> environment variables are configured for <code>psql</code> connectivity.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make check-pgtle</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.10. run-pgtle</a></h3>
+<div class="paragraph">
+<p>Registers all extensions with pg_tle by executing the generated pg_tle registration SQL files in a PostgreSQL database. This target:
+- Requires pg_tle extension to be installed (checked via <code>check-pgtle</code>)
+- Uses <code>pgtle.sh</code> to determine which version range directory to use based on the installed pg_tle version
+- Runs all generated SQL files via <code>psql</code> to register your extensions with pg_tle</p>
+</div>
+<div class="paragraph">
+<p>This target assumes that running <code>psql</code> without any arguments will connect to the desired database. You can control this by setting the various PG* environment variables (and possibly using the <code>.pgpassword</code> file). See the PostgreSQL documentation for more details.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+The <code>pgtle</code> target is a dependency, so <code>make run-pgtle</code> will automatically generate the SQL files if needed.
+</td>
+</tr>
+</table>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make run-pgtle</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>After running <code>make run-pgtle</code>, you can create your extension in the database:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>CREATE EXTENSION "your-extension-name";</pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_document_handling"><a class="anchor" href="#_document_handling"></a><a class="link" href="#_document_handling">5. Document Handling</a></h2>
+<h2 id="_version_specific_sql_files"><a class="anchor" href="#_version_specific_sql_files"></a><a class="link" href="#_version_specific_sql_files">5. Version-Specific SQL Files</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>PGXNtool automatically generates version-specific SQL files from your base SQL file. These files follow the pattern <code>sql/{extension}--{version}.sql</code> and are used by PostgreSQL&#8217;s extension system to install specific versions of your extension.</p>
+</div>
+<div class="sect2">
+<h3 id="_how_version_files_are_generated"><a class="anchor" href="#_how_version_files_are_generated"></a><a class="link" href="#_how_version_files_are_generated">5.1. How Version Files Are Generated</a></h3>
+<div class="paragraph">
+<p>When you run <code>make</code> (or <code>make all</code>), PGXNtool:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Reads your <code>META.json</code> file to determine the extension version from <code>provides.{extension}.version</code></p>
+</li>
+<li>
+<p>Generates a Makefile rule that copies your base SQL file (<code>sql/{extension}.sql</code>) to the version-specific file (<code>sql/{extension}--{version}.sql</code>)</p>
+</li>
+<li>
+<p>Executes this rule, creating the version-specific file with a header comment indicating it&#8217;s auto-generated</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>For example, if your <code>META.json</code> contains:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>"provides": {
+  "myext": {
+    "version": "1.2.3",
+    ...
+  }
+}</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Running <code>make</code> will create <code>sql/myext&#8212;&#8203;1.2.3.sql</code> by copying <code>sql/myext.sql</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_what_controls_the_version_number"><a class="anchor" href="#_what_controls_the_version_number"></a><a class="link" href="#_what_controls_the_version_number">5.2. What Controls the Version Number</a></h3>
+<div class="paragraph">
+<p>The version number comes from <code>META.json</code> → <code>provides.{extension}.version</code>, <strong>not</strong> from your <code>.control</code> file&#8217;s <code>default_version</code> field. The <code>.control</code> file&#8217;s <code>default_version</code> is used by PostgreSQL to determine which version to install by default, but the actual version-specific file that gets generated is determined by what&#8217;s in <code>META.json</code>.</p>
+</div>
+<div class="paragraph">
+<p>To change the version of your extension:
+1. Update <code>provides.{extension}.version</code> in <code>META.json</code>
+2. Run <code>make</code> to regenerate the version-specific file
+3. Update <code>default_version</code> in your <code>.control</code> file to match (if needed)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_committing_version_files"><a class="anchor" href="#_committing_version_files"></a><a class="link" href="#_committing_version_files">5.3. Committing Version Files</a></h3>
+<div class="paragraph">
+<p>Version-specific SQL files are now treated as permanent files that should be committed to your repository. This makes it much easier to test updates to extensions, as you can see exactly what SQL was included in each version.</p>
+</div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Important</div>
+</td>
+<td class="content">
+These files are auto-generated and include a header comment warning not to edit them. Any manual changes will be overwritten the next time you run <code>make</code>. To modify the extension, edit the base SQL file (<code>sql/{extension}.sql</code>) instead.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_alternative_ignoring_version_files"><a class="anchor" href="#_alternative_ignoring_version_files"></a><a class="link" href="#_alternative_ignoring_version_files">5.4. Alternative: Ignoring Version Files</a></h3>
+<div class="paragraph">
+<p>If you prefer not to commit version-specific SQL files, you must add them to your <code>.gitignore</code> to prevent <code>make dist</code> from failing due to untracked files. Add the following to your <code>.gitignore</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre># Auto-generated version-specific SQL files (if not committing them)
+sql/*--*.sql
+!sql/*--*--*.sql</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The second line (<code>!sql/<strong>--</strong>--*.sql</code>) ensures that upgrade scripts (which contain two version numbers and should be manually written) are still tracked.</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Warning</div>
+</td>
+<td class="content">
+If you ignore version files instead of committing them, they will NOT be included in your PGXN distribution (<code>make dist</code> uses <code>git archive</code>, which only includes tracked files). This means users installing your extension from PGXN will need <code>make</code> and PGXS available to build the extension - they cannot simply copy the SQL files into their PostgreSQL installation. For maximum compatibility, we recommend committing version files.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_distribution_inclusion"><a class="anchor" href="#_distribution_inclusion"></a><a class="link" href="#_distribution_inclusion">5.5. Distribution Inclusion</a></h3>
+<div class="paragraph">
+<p>Version-specific files are included in distributions created by <code>make dist</code> only if they are committed to git. Since <code>make dist</code> uses <code>git archive</code>, only tracked files are included in the distribution archive.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_multiple_versions"><a class="anchor" href="#_multiple_versions"></a><a class="link" href="#_multiple_versions">5.6. Multiple Versions</a></h3>
+<div class="paragraph">
+<p>If you need to support multiple versions of your extension:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Create additional version-specific files manually (e.g., <code>sql/myext&#8212;&#8203;1.0.0.sql</code>, <code>sql/myext&#8212;&#8203;1.1.0.sql</code>)</p>
+</li>
+<li>
+<p>Create upgrade scripts for version transitions (e.g., <code>sql/myext&#8212;&#8203;1.0.0&#8212;&#8203;1.1.0.sql</code>)</p>
+</li>
+<li>
+<p>Update <code>META.json</code> to reflect the current version you&#8217;re working on</p>
+</li>
+<li>
+<p>Commit all version files and upgrade scripts to your repository</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>The version file for the current version (specified in <code>META.json</code>) will be automatically regenerated when you run <code>make</code>, but other version files you create manually will be preserved.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_document_handling"><a class="anchor" href="#_document_handling"></a><a class="link" href="#_document_handling">6. Document Handling</a></h2>
 <div class="sectionbody">
 <div class="paragraph">
 <p>PGXNtool supports generation and installation of document files. There are several variables and rules that control this behavior.</p>
@@ -731,7 +948,7 @@ That way users will have these files installed when they install your extension.
 If any generated files are missing (or out-of-date) during installation, PGXNtool will build them if Asciidoc is present on the system.</p>
 </div>
 <div class="sect2">
-<h3 id="_document_variables"><a class="anchor" href="#_document_variables"></a><a class="link" href="#_document_variables">5.1. Document Variables</a></h3>
+<h3 id="_document_variables"><a class="anchor" href="#_document_variables"></a><a class="link" href="#_document_variables">6.1. Document Variables</a></h3>
 <div class="dlist">
 <dl>
 <dt class="hdlist1">DOC_DIRS</dt>
@@ -778,7 +995,7 @@ The result is appended to <code>ASCIIDOC_HTML</code> using <code>+=</code>.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_document_rules"><a class="anchor" href="#_document_rules"></a><a class="link" href="#_document_rules">5.2. Document Rules</a></h3>
+<h3 id="_document_rules"><a class="anchor" href="#_document_rules"></a><a class="link" href="#_document_rules">6.2. Document Rules</a></h3>
 <div class="paragraph">
 <p>If Asciidoc is found (or <code>$(ASCIIDOC)</code> is set), the <code>html</code> rule will be added as a prerequisite to the <code>install</code> and <code>installchec</code> rules.
 That will ensure that docs are generated for install and test, but only if Asciidoc is available.
@@ -820,7 +1037,7 @@ On a normal user system that should never happen, because the <code>html</code> 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_the_docs_variable"><a class="anchor" href="#_the_docs_variable"></a><a class="link" href="#_the_docs_variable">5.3. The DOCS variable</a></h3>
+<h3 id="_the_docs_variable"><a class="anchor" href="#_the_docs_variable"></a><a class="link" href="#_the_docs_variable">6.3. The DOCS variable</a></h3>
 <div class="paragraph">
 <p>This variable has special meaning to PGXS.
 See the Postgres documentation for full details.</p>
@@ -848,10 +1065,189 @@ Because of this, <code>base.mk</code> will forcibly define it to be NULL if it&#
 </div>
 </div>
 <div class="sect1">
-<h2 id="_copyright"><a class="anchor" href="#_copyright"></a><a class="link" href="#_copyright">6. Copyright</a></h2>
+<h2 id="_pg_tle_support"><a class="anchor" href="#_pg_tle_support"></a><a class="link" href="#_pg_tle_support">7. pg_tle Support</a></h2>
 <div class="sectionbody">
+<div id="_pg_tle_Support" class="paragraph">
+<p>pgxntool can generate <a href="https://github.com/aws/pg_tle">pg_tle (Trusted Language Extensions)</a> registration SQL for deploying PostgreSQL extensions in managed environments like AWS RDS and Aurora where filesystem access is not available.</p>
+</div>
 <div class="paragraph">
-<p>Copyright (c) 2015 Jim Nasby &lt;<a href="mailto:Jim.Nasby@BlueTreble.com">Jim.Nasby@BlueTreble.com</a>&gt;</p>
+<p>For make targets, see: <a href="#_pgtle">pgtle</a>, <a href="#_check_pgtle">check-pgtle</a>, <a href="#_run_pgtle">run-pgtle</a>.</p>
+</div>
+<div class="sect2">
+<h3 id="_what_is_pg_tle"><a class="anchor" href="#_what_is_pg_tle"></a><a class="link" href="#_what_is_pg_tle">7.1. What is pg_tle?</a></h3>
+<div class="paragraph">
+<p>pg_tle is an AWS open-source framework that enables developers to create and deploy PostgreSQL extensions without filesystem access. Traditional PostgreSQL extensions require <code>.control</code> and <code>.sql</code> files on the filesystem, which isn&#8217;t possible in managed services like RDS and Aurora.</p>
+</div>
+<div class="paragraph">
+<p>pg_tle solves this by:
+- Storing extension metadata and SQL in database tables
+- Using the <code>pgtle_admin</code> role for administrative operations
+- Enabling <code>CREATE EXTENSION</code> to work in managed environments</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_quick_start"><a class="anchor" href="#_quick_start"></a><a class="link" href="#_quick_start">7.2. Quick Start</a></h3>
+<div class="paragraph">
+<p>Generate pg_tle registration SQL for your extension:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make pgtle</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This creates files in <code>pg_tle/</code> subdirectories organized by pg_tle version ranges. See <code>pgtle_versions.md</code> for complete version range details and API compatibility boundaries.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_version_groupings"><a class="anchor" href="#_version_groupings"></a><a class="link" href="#_version_groupings">7.3. Version Groupings</a></h3>
+<div class="paragraph">
+<p>pgxntool creates different sets of files for different pg_tle versions to handle backward-incompatible API changes. Each version boundary represents a change to pg_tle&#8217;s API functions that we use.</p>
+</div>
+<div class="paragraph">
+<p>For details on version boundaries and API changes, see <code>pgtle_versions.md</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_installation_example"><a class="anchor" href="#_installation_example"></a><a class="link" href="#_installation_example">7.4. Installation Example</a></h3>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Important</div>
+</td>
+<td class="content">
+This is only a basic example. Always refer to the <a href="https://github.com/aws/pg_tle">main pg_tle documentation</a> for complete installation instructions and best practices.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Basic installation steps:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Ensure pg_tle is installed and grant the <code>pgtle_admin</code> role to your user</p>
+</li>
+<li>
+<p>Generate and run the pg_tle registration SQL files:</p>
+<div class="listingblock">
+<div class="content">
+<pre>make run-pgtle</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This automatically detects your pg_tle version and runs the appropriate SQL files. See <code>pgtle_versions.md</code> for version range details.</p>
+</div>
+</li>
+<li>
+<p>Create your extension: <code>CREATE EXTENSION myextension;</code></p>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_advanced_usage"><a class="anchor" href="#_advanced_usage"></a><a class="link" href="#_advanced_usage">7.5. Advanced Usage</a></h3>
+<div class="sect3">
+<h4 id="_multi_extension_projects"><a class="anchor" href="#_multi_extension_projects"></a><a class="link" href="#_multi_extension_projects">7.5.1. Multi-Extension Projects</a></h4>
+<div class="paragraph">
+<p>If your project has multiple extensions (multiple <code>.control</code> files), <code>make pgtle</code> generates files for all of them:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>myproject/
+├── ext1.control
+├── ext2.control
+└── pg_tle/
+    ├── 1.0.0-1.5.0/
+    │   ├── ext1.sql
+    │   └── ext2.sql
+    └── 1.5.0+/
+        ├── ext1.sql
+        └── ext2.sql</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_how_it_works"><a class="anchor" href="#_how_it_works"></a><a class="link" href="#_how_it_works">7.6. How It Works</a></h3>
+<div class="paragraph">
+<p><code>make pgtle</code> does the following:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Parses control file(s): Extracts <code>comment</code>, <code>default_version</code>, <code>requires</code>, and <code>schema</code> fields</p>
+</li>
+<li>
+<p>Discovers SQL files: Finds all versioned files (<code>sql/{ext}--{version}.sql</code>) and upgrade scripts (<code>sql/{ext}--{ver1}--{ver2}.sql</code>)</p>
+</li>
+<li>
+<p>Wraps SQL content: Uses a fixed dollar-quote delimiter (<code>$<em>pgtle_wrap_delimiter</em>$</code>) to wrap SQL for pg_tle functions</p>
+</li>
+<li>
+<p>Generates registration SQL: Creates <code>pgtle.install_extension()</code> calls for each version, <code>pgtle.install_update_path()</code> for upgrades, and <code>pgtle.set_default_version()</code> for the default</p>
+</li>
+<li>
+<p>Version-specific output: Generates separate files for different pg_tle capability levels</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Each generated SQL file is wrapped in a transaction (<code>BEGIN;</code> &#8230;&#8203; <code>COMMIT;</code>) to ensure atomic installation.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_troubleshooting"><a class="anchor" href="#_troubleshooting"></a><a class="link" href="#_troubleshooting">7.7. Troubleshooting</a></h3>
+<div class="sect3">
+<h4 id="_no_versioned_sql_files_found"><a class="anchor" href="#_no_versioned_sql_files_found"></a><a class="link" href="#_no_versioned_sql_files_found">7.7.1. "No versioned SQL files found"</a></h4>
+<div class="paragraph">
+<p><strong>Problem</strong>: The script can&#8217;t find <code>sql/{ext}--{version}.sql</code> files.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Run <code>make</code> first to generate versioned files from your base <code>sql/{ext}.sql</code> file.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_control_file_not_found"><a class="anchor" href="#_control_file_not_found"></a><a class="link" href="#_control_file_not_found">7.7.2. "Control file not found"</a></h4>
+<div class="paragraph">
+<p><strong>Problem</strong>: The script can&#8217;t find <code>{ext}.control</code> in the current directory.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Run <code>make pgtle</code> from your extension&#8217;s root directory (where the <code>.control</code> file is).</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_sql_file_contains_reserved_pg_tle_delimiter"><a class="anchor" href="#_sql_file_contains_reserved_pg_tle_delimiter"></a><a class="link" href="#_sql_file_contains_reserved_pg_tle_delimiter">7.7.3. "SQL file contains reserved pg_tle delimiter"</a></h4>
+<div class="paragraph">
+<p><strong>Problem</strong>: Your SQL files contain the string <code>$<em>pgtle_wrap_delimiter</em>$</code> (extremely unlikely).</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: Don&#8217;t use that dollar-quote delimiter in your code.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_extension_uses_c_code"><a class="anchor" href="#_extension_uses_c_code"></a><a class="link" href="#_extension_uses_c_code">7.7.4. Extension uses C code</a></h4>
+<div class="paragraph">
+<p><strong>Problem</strong>: Your control file has <code>module_pathname</code>, indicating C code.</p>
+</div>
+<div class="paragraph">
+<p><strong>Solution</strong>: pg_tle only supports trusted languages. You cannot use C extensions with pg_tle. The script will warn you but still generate files (which won&#8217;t work).</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+there are several untrusted languages (such as plpython), and the only tests for C.
+== Copyright
+Copyright (c) 2026 Jim Nasby &lt;<a href="mailto:Jim.Nasby@gmail.com">Jim.Nasby@gmail.com</a>&gt;
+</td>
+</tr>
+</table>
 </div>
 <div class="paragraph">
 <p>PGXNtool is released under a <a href="https://github.com/decibel/pgxntool/blob/master/LICENCE">BSD license</a>. Note that it includes <a href="https://github.com/dominictarr/JSON.sh">JSON.sh</a>, which is released under a <a href="https://github.com/decibel/pgxntool/blob/master/JSON.sh.LICENCE">MIT license</a>.</p>
@@ -859,9 +1255,11 @@ Because of this, <code>base.mk</code> will forcibly define it to be NULL if it&#
 </div>
 </div>
 </div>
+</div>
+</div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2025-11-14 14:57:12 -0600
+Last updated 2026-01-21 16:47:02 -0600
 </div>
 </div>
 </body>

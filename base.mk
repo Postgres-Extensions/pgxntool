@@ -1,5 +1,8 @@
 PGXNTOOL_DIR := pgxntool
 
+# Ensure 'all' is the default target (not META.json which happens to be first)
+.DEFAULT_GOAL := all
+
 #
 # META.json
 #
@@ -10,12 +13,29 @@ META.json: META.in.json $(PGXNTOOL_DIR)/build_meta.sh
 #
 # meta.mk
 #
-# Buind meta.mk, which contains info from META.json, and include it
+# Build meta.mk, which contains PGXN distribution info from META.json
 PGXNTOOL_distclean += meta.mk
 meta.mk: META.json Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/meta.mk.sh
 	@$(PGXNTOOL_DIR)/meta.mk.sh $< >$@
 
 -include meta.mk
+
+#
+# control.mk
+#
+# Build control.mk, which contains extension info from .control files
+# This is separate from meta.mk because:
+#   - META.json specifies PGXN distribution metadata
+#   - .control files specify what PostgreSQL actually uses (e.g., default_version)
+# These can differ, and PostgreSQL cares about the control file version.
+#
+# Find all control files first (needed for dependencies)
+PGXNTOOL_CONTROL_FILES := $(wildcard *.control)
+PGXNTOOL_distclean += control.mk
+control.mk: $(PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/control.mk.sh
+	@$(PGXNTOOL_DIR)/control.mk.sh $(PGXNTOOL_CONTROL_FILES) >$@
+
+-include control.mk
 
 DATA         = $(EXTENSION_VERSION_FILES) $(wildcard sql/*--*--*.sql)
 DOC_DIRS	+= doc
@@ -30,17 +50,18 @@ ASCIIDOC_FILES	+= $(foreach dir,$(DOC_DIRS),$(foreach ext,$(ASCIIDOC_EXTS),$(wil
 PG_CONFIG   ?= pg_config
 TESTDIR		?= test
 TESTOUT		?= $(TESTDIR)
-TEST_SOURCE_FILES	+= $(wildcard $(TESTDIR)/input/*.source)
-TEST_OUT_SOURCE_FILES	+= $(wildcard $(TESTDIR)/output/*.source)
-TEST_OUT_FILES		 = $(subst input,output,$(TEST_SOURCE_FILES))
+# .source files are OPTIONAL - see "pg_regress workflow" comment below for details
+TEST__SOURCE__INPUT_FILES	+= $(wildcard $(TESTDIR)/input/*.source)
+TEST__SOURCE__OUTPUT_FILES	+= $(wildcard $(TESTDIR)/output/*.source)
+TEST__SOURCE__INPUT_AS_OUTPUT		 = $(subst input,output,$(TEST__SOURCE__INPUT_FILES))
 TEST_SQL_FILES		+= $(wildcard $(TESTDIR)/sql/*.sql)
 TEST_RESULT_FILES	 = $(patsubst $(TESTDIR)/sql/%.sql,$(TESTDIR)/expected/%.out,$(TEST_SQL_FILES))
-TEST_FILES	 = $(TEST_SOURCE_FILES) $(TEST_SQL_FILES)
+TEST_FILES	 = $(TEST__SOURCE__INPUT_FILES) $(TEST_SQL_FILES)
 # Ephemeral files generated from source files (should be cleaned)
 # input/*.source → sql/*.sql (converted by pg_regress)
-TEST_SQL_FROM_SOURCE	 = $(patsubst $(TESTDIR)/input/%.source,$(TESTDIR)/sql/%.sql,$(TEST_SOURCE_FILES))
+TEST__SOURCE__SQL_FILES	 = $(patsubst $(TESTDIR)/input/%.source,$(TESTDIR)/sql/%.sql,$(TEST__SOURCE__INPUT_FILES))
 # output/*.source → expected/*.out (converted by pg_regress)
-TEST_EXPECTED_FROM_SOURCE = $(patsubst $(TESTDIR)/output/%.source,$(TESTDIR)/expected/%.out,$(TEST_OUT_SOURCE_FILES))
+TEST__SOURCE__EXPECTED_FILES = $(patsubst $(TESTDIR)/output/%.source,$(TESTDIR)/expected/%.out,$(TEST__SOURCE__OUTPUT_FILES))
 REGRESS		 = $(sort $(notdir $(subst .source,,$(TEST_FILES:.sql=)))) # Sort is to get unique list
 REGRESS_OPTS = --inputdir=$(TESTDIR) --outputdir=$(TESTOUT) # See additional setup below
 MODULES      = $(patsubst %.c,%,$(wildcard src/*.c))
@@ -48,7 +69,7 @@ ifeq ($(strip $(MODULES)),)
 MODULES =# Set to NUL so PGXS doesn't puke
 endif
 
-EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) $(EXTENSION_VERSION_FILES) $(TEST_SQL_FROM_SOURCE) $(TEST_EXPECTED_FROM_SOURCE)
+EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) $(TEST__SOURCE__SQL_FILES) $(TEST__SOURCE__EXPECTED_FILES) pg_tle/
 
 # Get Postgres version, as well as major (9.4, etc) version.
 # NOTE! In at least some versions, PGXS defines VERSION, so we intentionally don't use that variable
@@ -76,7 +97,7 @@ DATA += $(wildcard *.control)
 
 # Don't have installcheck bomb on error
 .IGNORE: installcheck
-installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) $(TEST_SOURCE_FILES) | $(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/
+installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) $(TEST__SOURCE__INPUT_FILES) | $(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/
 
 #
 # TEST SUPPORT
@@ -119,6 +140,51 @@ results: test
 # testdeps is a generic dependency target that you can add targets to
 .PHONY: testdeps
 testdeps: pgtap
+
+#
+# pg_tle support - Generate pg_tle registration SQL
+#
+
+# PGXNTOOL_CONTROL_FILES is defined above (for control.mk dependencies)
+PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
+
+# Main target
+# Depend on 'all' to ensure versioned SQL files are generated first
+# Depend on control.mk (which defines EXTENSION_VERSION_FILES)
+# Depend on control files explicitly so changes trigger rebuilds
+# Generates all supported pg_tle versions for each extension
+.PHONY: pgtle
+pgtle: all control.mk $(PGXNTOOL_CONTROL_FILES)
+	@$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext);)
+
+#
+# pg_tle installation support
+#
+
+# Check if pg_tle is installed and report version
+# Only reports version if CREATE EXTENSION pg_tle has been run
+# Errors if pg_tle extension is not installed
+# Uses pgtle.sh to get version (avoids code duplication)
+.PHONY: check-pgtle
+check-pgtle:
+	@echo "Checking pg_tle installation..."
+	@PGTLE_VERSION=$$($(PGXNTOOL_DIR)/pgtle.sh --get-version 2>/dev/null); \
+	if [ -n "$$PGTLE_VERSION" ]; then \
+		echo "pg_tle extension version: $$PGTLE_VERSION"; \
+		exit 0; \
+	fi; \
+	echo "ERROR: pg_tle extension is not installed" >&2; \
+	echo "       Run 'CREATE EXTENSION pg_tle;' first" >&2; \
+	exit 1
+
+# Run pg_tle registration SQL files
+# Requires pg_tle extension to be installed (checked via check-pgtle)
+# Uses pgtle.sh to determine which version range directory to use
+# Assumes PG* environment variables are configured
+.PHONY: run-pgtle
+run-pgtle: pgtle
+	@$(PGXNTOOL_DIR)/pgtle.sh --run
 
 # These targets ensure all the relevant directories exist
 $(TESTDIR)/sql $(TESTDIR)/expected/ $(TESTOUT)/results/:
@@ -172,14 +238,23 @@ docclean:
 #
 rmtag:
 	git fetch origin # Update our remotes
-	@test -z "$$(git branch --list $(PGXNVERSION))" || git branch -d $(PGXNVERSION)
-	@test -z "$$(git branch --list -r origin/$(PGXNVERSION))" || git push --delete origin $(PGXNVERSION)
+	@test -z "$$(git tag --list $(PGXNVERSION))" || git tag -d $(PGXNVERSION)
+	@test -z "$$(git ls-remote --tags origin $(PGXNVERSION) | grep -v '{}')" || git push --delete origin $(PGXNVERSION)
 
-# TODO: Don't puke if tag already exists *and is the same*
 tag:
 	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
-	git branch $(PGXNVERSION)
-	git push --set-upstream origin $(PGXNVERSION)
+	@# Skip if tag already exists and points to HEAD
+	@if git rev-parse $(PGXNVERSION) >/dev/null 2>&1; then \
+		if [ "$$(git rev-parse $(PGXNVERSION))" = "$$(git rev-parse HEAD)" ]; then \
+			echo "Tag $(PGXNVERSION) already exists at HEAD, skipping"; \
+		else \
+			echo "ERROR: Tag $(PGXNVERSION) exists but points to different commit" >&2; \
+			exit 1; \
+		fi; \
+	else \
+		git tag $(PGXNVERSION); \
+	fi
+	git push origin $(PGXNVERSION)
 
 .PHONY: forcetag
 forcetag: rmtag tag

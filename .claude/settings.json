@@ -13,8 +13,7 @@
       "Bash(head:*)"
     ],
     "additionalDirectories": [
-      "../pgxntool-test/",
-      "../pgxntool-test-template/"
+      "../pgxntool-test/"
     ]
   }
 }
