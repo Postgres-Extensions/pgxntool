@@ -21,15 +21,8 @@
 
 set -e
 
-error () {
-    echo $@ >&2
-}
-die () {
-    return=$1
-    shift
-    error $@
-    exit $return
-}
+BASEDIR=$(dirname "$0")
+source "$BASEDIR/lib.sh"
 
 [ $# -eq 2 ] || die 2 Invalid number of arguments $#
 

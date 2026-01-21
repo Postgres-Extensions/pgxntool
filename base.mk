@@ -1,5 +1,8 @@
 PGXNTOOL_DIR := pgxntool
 
+# Ensure 'all' is the default target (not META.json which happens to be first)
+.DEFAULT_GOAL := all
+
 #
 # META.json
 #
@@ -10,12 +13,29 @@ META.json: META.in.json $(PGXNTOOL_DIR)/build_meta.sh
 #
 # meta.mk
 #
-# Buind meta.mk, which contains info from META.json, and include it
+# Build meta.mk, which contains PGXN distribution info from META.json
 PGXNTOOL_distclean += meta.mk
 meta.mk: META.json Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/meta.mk.sh
 	@$(PGXNTOOL_DIR)/meta.mk.sh $< >$@
 
 -include meta.mk
+
+#
+# control.mk
+#
+# Build control.mk, which contains extension info from .control files
+# This is separate from meta.mk because:
+#   - META.json specifies PGXN distribution metadata
+#   - .control files specify what PostgreSQL actually uses (e.g., default_version)
+# These can differ, and PostgreSQL cares about the control file version.
+#
+# Find all control files first (needed for dependencies)
+PGXNTOOL_CONTROL_FILES := $(wildcard *.control)
+PGXNTOOL_distclean += control.mk
+control.mk: $(PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/control.mk.sh
+	@$(PGXNTOOL_DIR)/control.mk.sh $(PGXNTOOL_CONTROL_FILES) >$@
+
+-include control.mk
 
 DATA         = $(EXTENSION_VERSION_FILES) $(wildcard sql/*--*--*.sql)
 DOC_DIRS	+= doc
@@ -125,17 +145,16 @@ testdeps: pgtap
 # pg_tle support - Generate pg_tle registration SQL
 #
 
-# Discover all extensions from control files in current directory
-PGXNTOOL_CONTROL_FILES = $(wildcard *.control)
+# PGXNTOOL_CONTROL_FILES is defined above (for control.mk dependencies)
 PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
 
 # Main target
 # Depend on 'all' to ensure versioned SQL files are generated first
-# Depend on meta.mk (which defines EXTENSION_VERSION_FILES)
+# Depend on control.mk (which defines EXTENSION_VERSION_FILES)
 # Depend on control files explicitly so changes trigger rebuilds
 # Generates all supported pg_tle versions for each extension
 .PHONY: pgtle
-pgtle: all meta.mk $(PGXNTOOL_CONTROL_FILES)
+pgtle: all control.mk $(PGXNTOOL_CONTROL_FILES)
 	@$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
 		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext);)
 

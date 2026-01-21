@@ -9,6 +9,7 @@
 
 # Generated make files
 meta.mk
+control.mk
 
 # Compiler output
 *.o
