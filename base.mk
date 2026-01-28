@@ -291,9 +291,15 @@ print-%	: ; $(info $* is $(flavor $*) variable set to "$($*)") @true
 #
 # This is setup to allow any number of pull targets by defining special
 # variables. pgxntool-sync-release is an example of this.
-.PHONY: pgxn-sync-%
+#
+# After the subtree pull, we run update-setup-files.sh to handle files that
+# were initially copied by setup.sh (like .gitignore). This script does a
+# 3-way merge if both you and pgxntool changed the file.
+.PHONY: pgxntool-sync-%
 pgxntool-sync-%:
-	git subtree pull -P pgxntool --squash -m "Pull pgxntool from $($@)" $($@)
+	@old_commit=$$(git log -1 --format=%H -- pgxntool/); \
+	git subtree pull -P pgxntool --squash -m "Pull pgxntool from $($@)" $($@); \
+	pgxntool/update-setup-files.sh "$$old_commit"
 pgxntool-sync: pgxntool-sync-release
 
 # DANGER! Use these with caution. They may add extra crap to your history and
