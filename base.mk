@@ -313,8 +313,10 @@ pgxntool-sync: pgxntool-sync-release
 # could make resolving merges difficult!
 pgxntool-sync-release	:= git@github.com:decibel/pgxntool.git release
 pgxntool-sync-stable	:= git@github.com:decibel/pgxntool.git stable
+pgxntool-sync-master	:= git@github.com:decibel/pgxntool.git master
 pgxntool-sync-local		:= ../pgxntool release # Not the same as PGXNTOOL_DIR!
 pgxntool-sync-local-stable	:= ../pgxntool stable # Not the same as PGXNTOOL_DIR!
+pgxntool-sync-local-master	:= ../pgxntool master # Not the same as PGXNTOOL_DIR!
 
 distclean:
 	rm -f $(PGXNTOOL_distclean)
