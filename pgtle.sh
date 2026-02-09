@@ -661,17 +661,17 @@ generate_header() {
  *   - Upgrade paths: ${upgrade_count} path(s)
  *   - Default version: ${DEFAULT_VERSION}
  *
- * Installation instructions:
- *   1. Ensure pg_tle is installed:
- *      CREATE EXTENSION pg_tle;
+ * Installation:
+ *   Recommended: make run-pgtle
+ *   (or: pgxntool/pgtle.sh --run)
  *
- *   2. Ensure you have pgtle_admin role:
- *      GRANT pgtle_admin TO your_username;
+ *   This automatically detects your pg_tle version and runs the correct file.
  *
- *   3. Run this file:
- *      psql -f $(basename "$output_file")
+ *   Prerequisites:
+ *   - pg_tle extension installed (CREATE EXTENSION pg_tle;)
+ *   - pgtle_admin role (GRANT pgtle_admin TO your_username;)
  *
- *   4. Create the extension:
+ *   After registration, create the extension:
  *      CREATE EXTENSION ${EXTENSION};
  *
  * Version compatibility:
