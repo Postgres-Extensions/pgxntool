@@ -6,6 +6,7 @@ PGXNTOOL_DIR := pgxntool
 #
 # META.json
 #
+PGXNTOOL_distclean += META.json
 META.json: META.in.json $(PGXNTOOL_DIR)/build_meta.sh
 	@$(PGXNTOOL_DIR)/build_meta.sh $< $@
 
@@ -13,6 +14,7 @@ META.json: META.in.json $(PGXNTOOL_DIR)/build_meta.sh
 # meta.mk
 #
 # Build meta.mk, which contains PGXN distribution info from META.json
+PGXNTOOL_distclean += meta.mk
 meta.mk: META.json Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/meta.mk.sh
 	@$(PGXNTOOL_DIR)/meta.mk.sh $< >$@
 
@@ -29,6 +31,7 @@ meta.mk: META.json Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/meta.mk.sh
 #
 # Find all control files first (needed for dependencies)
 PGXNTOOL_CONTROL_FILES := $(wildcard *.control)
+PGXNTOOL_distclean += control.mk
 control.mk: $(PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/control.mk.sh
 	@$(PGXNTOOL_DIR)/control.mk.sh $(PGXNTOOL_CONTROL_FILES) >$@
 
