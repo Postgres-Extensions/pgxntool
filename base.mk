@@ -83,9 +83,10 @@ pgxntool_validate_yesno = $(strip \
 # Variable: PGXNTOOL_ENABLE_TEST_BUILD
 #   - Can be set manually in Makefile or command line
 #   - Allowed values: "yes" or "no" (case-insensitive)
-#   - Setting to empty on the command line (e.g. PGXNTOOL_ENABLE_TEST_BUILD=) also disables the feature
 #   - If not set: Auto-detects based on existence of test/build/*.sql files
-#   - Usage: Controls whether test-build target exists and runs before make test
+#   - Set to "yes" explicitly to get an error if test/build/ has no SQL files
+#     (useful to catch accidental deletion of test/build/ contents)
+#   - Set to "no" explicitly to disable even when test/build/ has SQL files
 #
 # Implementation: See test-build target definition (search for "test-build:" in this file)
 #
@@ -113,9 +114,10 @@ endif
 # Variable: PGXNTOOL_ENABLE_TEST_INSTALL
 #   - Can be set manually in Makefile or command line
 #   - Allowed values: "yes" or "no" (case-insensitive)
-#   - Setting to empty on the command line (e.g. PGXNTOOL_ENABLE_TEST_INSTALL=) also disables the feature
 #   - If not set: Auto-detects based on existence of test/install/*.sql files
-#   - Usage: Controls whether schedule files are generated for test/install
+#   - Set to "yes" explicitly to get an error if test/install/ has no SQL files
+#     (useful to catch accidental deletion of test/install/ contents)
+#   - Set to "no" explicitly to disable even when test/install/ has SQL files
 #
 # Directory layout (follows ~/code/extensions/archive/ pattern):
 #   test/install/*.sql      - Install SQL files
