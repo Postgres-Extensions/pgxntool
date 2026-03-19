@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # pgxntool/run-test-build.sh - Prepare test/build/ for the test-build target
 #
 # Sets up the generated sql/ directory and ensures expected/*.out files exist
@@ -18,12 +18,12 @@ EXPECTED_DIR="$BUILD_DIR/expected"
 mkdir -p "$SQL_DIR"
 mkdir -p "$EXPECTED_DIR"
 
-# Copy .sql files to sql/ directory for pg_regress
-for file in "$BUILD_DIR"/*.sql; do
-	# If there aren't any files that match *.sql, we get a string with the literal *.sql, so check for that.
-	[ -f "$file" ] || continue
-	cp "$file" "$SQL_DIR/$(basename "$file")"
-done
+# Copy .sql files to sql/ directory for pg_regress.
+# When no files match, bash leaves the glob unexpanded (literal "*.sql").
+# Capture into an array first: if the first element equals the literal pattern,
+# no files matched and we skip the copy.
+files=("$BUILD_DIR"/*.sql)
+[ "${files[0]}" = "$BUILD_DIR/*.sql" ] || cp "${files[@]}" "$SQL_DIR/"
 
 # Create empty expected/*.out files for .sql tests (if not already present).
 # pg_regress requires an expected file to exist for each test; without it
