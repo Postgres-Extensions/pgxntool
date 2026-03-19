@@ -241,6 +241,12 @@ Generated files depend on:
 5. **PGXNTOOL_NO_PGXS_INCLUDE**: Setting this skips PGXS inclusion (for special scenarios)
 6. **Distribution Placement**: `.zip` files go in parent directory (`../`) to avoid repo clutter
 
+## Shell Script Standards
+
+**RULE**: Always use `#!/usr/bin/env bash`, never `#!/bin/bash`.
+
+`/bin/bash` hardcodes the path and fails on systems where bash is elsewhere (some BSDs, NixOS, Homebrew on macOS). `#!/usr/bin/env bash` finds bash on `PATH` and works everywhere.
+
 ## Scripts
 
 - **setup.sh** - Initializes pgxntool in a new extension project (copies templates, creates directories)

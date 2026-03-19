@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # lib.sh - Common utility functions for pgxntool scripts
 #
 # This file is meant to be sourced by other scripts, not executed directly.
