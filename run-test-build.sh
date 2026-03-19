@@ -19,9 +19,8 @@ mkdir -p "$SQL_DIR"
 mkdir -p "$EXPECTED_DIR"
 
 # Copy .sql files to sql/ directory for pg_regress
-# Note: [ -f ] guards against no glob matches (bash returns the literal
-# glob string "*.sql" rather than nothing when no files match).
 for file in "$BUILD_DIR"/*.sql; do
+	# If there aren't any files that match *.sql, we get a string with the literal *.sql, so check for that.
 	[ -f "$file" ] || continue
 	cp "$file" "$SQL_DIR/$(basename "$file")"
 done
