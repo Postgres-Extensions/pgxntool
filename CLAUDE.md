@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Scope of This File
+
+The guidance in this CLAUDE.md applies to pgxntool's own source files and provides
+recommended best practices for projects using pgxntool. However, any agent working in
+an extension project should always defer to that project's own CLAUDE.md and
+instructions over anything stated here.
+
 ## Git Commit Guidelines
 
 **IMPORTANT**: When creating commit messages, do not attribute commits to yourself (Claude). Commit messages should reflect the work being done without AI attribution in the message body. The standard Co-Authored-By trailer is acceptable.
