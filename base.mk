@@ -448,9 +448,8 @@ dist: html
 # But don't add it as an install or test dependency unless we do have asciidoc
 ifneq (,$(strip $(ASCIIDOC)))
 
-# Add generated HTML to DOCS for install. Use filter-out first to prevent
-# duplicate entries: the wildcard at line 43 may have already picked up HTML
-# files if they were built by a prior `make html` run.
+# Add HTML to DOCS for install, deduplicating against any HTML already picked
+# up by the wildcard (e.g. pre-built HTML committed to the repo).
 DOCS := $(sort $(filter-out $(ASCIIDOC_HTML),$(DOCS)) $(ASCIIDOC_HTML))
 
 # Also need to add html as a dep to all (which will get picked up by install & installcheck

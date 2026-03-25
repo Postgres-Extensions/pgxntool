@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # pgtle.sh - Generate pg_tle registration SQL for PostgreSQL extensions
 #
