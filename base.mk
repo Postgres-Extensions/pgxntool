@@ -276,38 +276,7 @@ ifeq ($(PGXNTOOL_ENABLE_VERIFY_RESULTS),yes)
 .PHONY: verify-results
 ifeq ($(PGXNTOOL_VERIFY_RESULTS_MODE),pgtap)
 verify-results:
-	@# Check for pgtap failures in result files (excluding TODO items)
-	@failed=0; \
-	for f in $(TESTOUT)/results/*.out; do \
-		[ -f "$$f" ] || continue; \
-		if grep -q '^not ok' "$$f"; then \
-			notok=$$(grep '^not ok' "$$f" | grep -v '# TODO' || true); \
-			if [ -n "$$notok" ]; then \
-				echo "ERROR: pgtap failure detected in $$f"; \
-				echo "$$notok"; \
-				failed=1; \
-			fi; \
-		fi; \
-		if grep -q 'Looks like you planned' "$$f"; then \
-			echo "ERROR: pgtap plan mismatch in $$f"; \
-			grep 'Looks like you planned' "$$f"; \
-			failed=1; \
-		fi; \
-	done; \
-	if [ $$failed -ne 0 ]; then \
-		echo ""; \
-		echo "pgtap failures detected. Cannot run 'make results'."; \
-		exit 1; \
-	fi
-	@# Also check regression.diffs (output mismatch even if pgtap all passed)
-	@if [ -r $(TESTOUT)/regression.diffs ]; then \
-		echo "ERROR: Tests are failing. Cannot run 'make results'."; \
-		echo "Fix test failures first, then run 'make results'."; \
-		echo ""; \
-		echo "See $(TESTOUT)/regression.diffs for details:"; \
-		cat $(TESTOUT)/regression.diffs; \
-		exit 1; \
-	fi
+	@$(PGXNTOOL_DIR)/verify-results-pgtap.sh $(TESTOUT)
 else
 verify-results:
 	@if [ -r $(TESTOUT)/regression.diffs ]; then \
