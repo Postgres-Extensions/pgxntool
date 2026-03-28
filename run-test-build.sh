@@ -18,12 +18,17 @@ EXPECTED_DIR="$BUILD_DIR/expected"
 mkdir -p "$SQL_DIR"
 mkdir -p "$EXPECTED_DIR"
 
-# Copy .sql files to sql/ directory for pg_regress.
-# When no files match, bash leaves the glob unexpanded (literal "*.sql").
-# Capture into an array first: if the first element equals the literal pattern,
-# no files matched and we skip the copy.
-files=("$BUILD_DIR"/*.sql)
-[ "${files[0]}" = "$BUILD_DIR/*.sql" ] || cp "${files[@]}" "$SQL_DIR/"
+# Sync .sql files to sql/ directory for pg_regress.
+# --checksum: compare by content, not size+mtime. rsync's default "quick check"
+#   assumes equal size+mtime means files are identical, which isn't safe here —
+#   builds can produce identical-sized files with different content. Checksum
+#   comparison also avoids unnecessary writes that could trigger antivirus.
+# --times: preserve source mtimes on destination files so make's dependency
+#   tracking works correctly.
+# --delete: remove files from sql/ that no longer exist in build/.
+# --include/--exclude: select only *.sql from the directory source
+#   (--delete requires a directory transfer, not individual file arguments).
+rsync -r --checksum --times --delete --include='*.sql' --exclude='*' "$BUILD_DIR/" "$SQL_DIR/"
 
 # Create empty expected/*.out files for .sql tests (if not already present).
 # pg_regress requires an expected file to exist for each test; without it
@@ -31,12 +36,5 @@ files=("$BUILD_DIR"/*.sql)
 for file in "$BUILD_DIR"/*.sql; do
 	[ -f "$file" ] || continue
 	out="$EXPECTED_DIR/$(basename "$file" .sql).out"
-	[ -f "$out" ] || touch "$out"
-done
-
-# Create empty expected/*.out files for input/*.source tests (if not already present)
-for file in "$BUILD_DIR/input"/*.source; do
-	[ -f "$file" ] || continue
-	out="$EXPECTED_DIR/$(basename "$file" .source).out"
 	[ -f "$out" ] || touch "$out"
 done

@@ -398,13 +398,12 @@ $(TEST_RESULT_FILES): | $(TESTDIR)/expected/
 #
 # test-build: Sanity check extension files in test/build/
 #
-# The sql/ subdirectory is generated - files are copied from test/build/*.sql
-# and pg_regress generates sql/ from input/*.source files.
+# The sql/ subdirectory is generated - files are synced from test/build/*.sql.
 # This directory should be in .gitignore and is cleaned by make clean.
 #
 ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_BUILD_SQL_DIR = $(TESTDIR)/build/sql
-TEST_BUILD_REGRESS = $(sort $(notdir $(basename $(TEST_BUILD_SQL_FILES))) $(notdir $(basename $(TEST_BUILD_SOURCE_FILES:.source=))))
+TEST_BUILD_REGRESS = $(sort $(notdir $(basename $(TEST_BUILD_SQL_FILES))))
 .PHONY: test-build
 test-build: install
 	@if [ -z "$(strip $(TEST_BUILD_FILES))" ]; then \

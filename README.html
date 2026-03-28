@@ -612,7 +612,7 @@ While you can still run <code>make installcheck</code> or any other valid PGXS m
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Place SQL files in <code>test/build/<strong>.sql</code> (or <code>test/build/input/</strong>.source</code> for source-processed files)</p>
+<p>Place SQL files in <code>test/build/*.sql</code></p>
 </li>
 <li>
 <p>Place expected output in <code>test/build/expected/*.out</code></p>
@@ -632,12 +632,10 @@ While you can still run <code>make installcheck</code> or any other valid PGXS m
 <div class="content">
 <pre>test/build/
 ├── *.sql              # SQL test files (checked in)
-├── input/             # Optional: .source files for pg_regress processing (checked in)
-│   └── *.source       # Checked in; pg_regress substitutes tokens into sql/ copies
 ├── expected/          # Expected output files (checked in)
 │   └── *.out
 └── sql/               # GENERATED - do not edit or check in
-    └── *.sql          # Copied from *.sql above and generated from input/*.source</pre>
+    └── *.sql          # Synced from *.sql above</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -647,7 +645,7 @@ While you can still run <code>make installcheck</code> or any other valid PGXS m
 <p><strong>Configuration:</strong></p>
 </div>
 <div class="paragraph">
-<p>The feature auto-detects based on whether <code>test/build/<strong>.sql</code> or <code>test/build/input/</strong>.source</code> files exist:</p>
+<p>The feature auto-detects based on whether <code>test/build/*.sql</code> files exist:</p>
 </div>
 <div class="ulist">
 <ul>
@@ -1500,7 +1498,7 @@ Copyright (c) 2026 Jim Nasby &lt;<a href="mailto:Jim.Nasby@gmail.com">Jim.Nasby@
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-03-11 17:30:59 -0500
+Last updated 2026-03-26 16:45:03 -0500
 </div>
 </div>
 </body>
