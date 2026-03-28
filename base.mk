@@ -406,10 +406,6 @@ TEST_BUILD_SQL_DIR = $(TESTDIR)/build/sql
 TEST_BUILD_REGRESS = $(sort $(notdir $(basename $(TEST_BUILD_SQL_FILES))))
 .PHONY: test-build
 test-build: install
-	@if [ -z "$(strip $(TEST_BUILD_FILES))" ]; then \
-		echo "No files found in $(TESTDIR)/build/"; \
-		exit 1; \
-	fi
 	@$(PGXNTOOL_DIR)/run-test-build.sh $(TESTDIR)
 	$(MAKE) -C . REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
 	@if [ -r $(TESTDIR)/build/regression.diffs ]; then \

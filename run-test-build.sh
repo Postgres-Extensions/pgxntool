@@ -18,6 +18,14 @@ EXPECTED_DIR="$BUILD_DIR/expected"
 mkdir -p "$SQL_DIR"
 mkdir -p "$EXPECTED_DIR"
 
+# Verify .sql files exist. This script is only called when test-build is
+# enabled, so missing files indicate a misconfiguration.
+files=("$BUILD_DIR"/*.sql)
+if [ ! -f "${files[0]}" ]; then
+	echo "ERROR: no .sql files found in $BUILD_DIR/" >&2
+	exit 1
+fi
+
 # Sync .sql files to sql/ directory for pg_regress.
 # --checksum: compare by content, not size+mtime. rsync's default "quick check"
 #   assumes equal size+mtime means files are identical, which isn't safe here —
@@ -34,7 +42,6 @@ rsync -r --checksum --times --delete --include='*.sql' --exclude='*' "$BUILD_DIR
 # pg_regress requires an expected file to exist for each test; without it
 # pg_regress stops immediately rather than running the test and showing the diff.
 for file in "$BUILD_DIR"/*.sql; do
-	[ -f "$file" ] || continue
 	out="$EXPECTED_DIR/$(basename "$file" .sql).out"
 	[ -f "$out" ] || touch "$out"
 done
