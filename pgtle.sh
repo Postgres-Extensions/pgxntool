@@ -459,15 +459,17 @@ parse_control_file() {
             local key="${BASH_REMATCH[1]}"
             local value="${BASH_REMATCH[2]}"
 
+            # Trim trailing comments and whitespace FIRST, then strip quotes.
+            # Order matters: stripping quotes before removing comments leaves a rogue
+            # trailing quote for values like 'version' # note. See issue #25.
+            value="${value%%#*}"  # Remove trailing comments
+            value="${value%% }"   # Trim trailing whitespace
+
             # Strip quotes if present (both single and double)
             value="${value#\'}"
             value="${value%\'}"
             value="${value#\"}"
             value="${value%\"}"
-
-            # Trim trailing whitespace/comments
-            value="${value%%#*}"  # Remove trailing comments
-            value="${value%% }"   # Trim trailing spaces
 
             # Store in global variables
             case "$key" in
