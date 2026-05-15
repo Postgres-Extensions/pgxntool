@@ -60,13 +60,18 @@ array_not_empty() {
 # Debug function
 # Usage: debug LEVEL "message"
 # Outputs message to stderr if DEBUG >= LEVEL
-# Debug levels use multiples of 10 (10, 20, 30, 40, etc.) to allow for easy expansion
-#   - 10: Critical errors, important warnings
-#   - 20: Warnings, significant state changes
-#   - 30: General debugging, function entry/exit, array operations
-#   - 40: Verbose details, loop iterations
-#   - 50+: Maximum verbosity
-# Enable with: DEBUG=30 scriptname.sh
+#
+# Debug levels use ranges, not strict multiples, to leave room for fine-tuning
+# without renumbering. The order of magnitude gives a rough sense of verbosity:
+#   - 1-9:   High-level script context: arguments (1), top-level entry/exit (2-3),
+#            lower-level helper calls (4-5)
+#   - 10-19: Per-iteration detail inside loops: exit+status (10), entry (11),
+#            intermediate results (15)
+#   - 20-29: Nesting inside loop-level detail
+#   - Higher ranges follow the same pattern
+#
+# A non-trivial script with loops should have debug calls in multiple ranges.
+# Enable with: DEBUG=15 scriptname.sh
 debug() {
     local level=$1
     shift
