@@ -1,4 +1,4 @@
-name: Protect 'no-test-pr' label
+name: Protect 'commit-with-no-tests' label
 
 on:
   # IMPORTANT: Must use pull_request_target, NOT pull_request.
@@ -21,14 +21,14 @@ jobs:
   protect:
     # Only fire for the label we care about. All other label changes are
     # unaffected by this workflow.
-    if: github.event.label.name == 'no-test-pr'
+    if: github.event.label.name == 'commit-with-no-tests'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write  # To add/remove labels
       issues: write         # GitHub label API goes through the issues endpoint
 
     steps:
-      - name: Enforce write-access-only on 'no-test-pr' label
+      - name: Enforce write-access-only on 'commit-with-no-tests' label
         uses: actions/github-script@v7
         with:
           script: |
@@ -87,21 +87,23 @@ jobs:
             }
 
             if (action === 'labeled' && !hasWrite) {
-              core.info(`${actor} lacks write access; removing 'no-test-pr' label`);
+              core.info(`${actor} lacks write access; removing 'commit-with-no-tests' label`);
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                name: 'no-test-pr'
+                name: 'commit-with-no-tests'
               });
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
                 body:
-                  `@${actor} The \`no-test-pr\` label can only be applied by maintainers ` +
-                  `with write access to this repository. ` +
-                  `Please ask a maintainer to apply it if no test changes are needed for this PR.`
+                  `@${actor} The \`commit-with-no-tests\` label can only be applied by ` +
+                  `maintainers with write access to this repository.\n\n` +
+                  `If you believe no test changes are needed for this PR, please ask a ` +
+                  `maintainer to apply the label after reviewing. Note that most pgxntool ` +
+                  `changes do require paired test updates — this label should be used sparingly.`
               });
 
             } else if (action === 'unlabeled' && !hasWrite) {
@@ -111,27 +113,27 @@ jobs:
               // between removal and this workflow re-adding the label. During
               // that window the label genuinely does not exist. This is harmless
               // in practice: the ci.yml workflow reads labels via a live API
-              // call (not from its cached payload), and the window is typically
-              // under 30 seconds — far less than the 5-minute polling interval.
-              core.info(`${actor} lacks write access; re-adding 'no-test-pr' label`);
+              // call (not from its cached payload), so a re-run after the label
+              // is restored will pick it up correctly.
+              core.info(`${actor} lacks write access; re-adding 'commit-with-no-tests' label`);
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                labels: ['no-test-pr']
+                labels: ['commit-with-no-tests']
               });
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
                 body:
-                  `@${actor} The \`no-test-pr\` label can only be removed by maintainers ` +
-                  `with write access to this repository. ` +
+                  `@${actor} The \`commit-with-no-tests\` label can only be removed by ` +
+                  `maintainers with write access to this repository.\n\n` +
                   `Contact a maintainer if you believe this label was applied in error.`
               });
 
             } else if (hasWrite) {
               core.info(
-                `${actor} has write access; '${action}' on 'no-test-pr' label is approved`
+                `${actor} has write access; '${action}' on 'commit-with-no-tests' label is approved`
               );
             }
