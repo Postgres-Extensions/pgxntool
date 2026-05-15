@@ -1,0 +1,249 @@
+name: CI
+
+on:
+  pull_request:
+    # We use 'pull_request' (not 'pull_request_target') deliberately.
+    # 'pull_request_target' runs with write access to the base repo, which is
+    # a security risk for untrusted fork code. Since this workflow only reads
+    # from other public repos (no secrets needed), 'pull_request' is correct
+    # and safe even for fork PRs.
+
+jobs:
+  resolve-test-ref:
+    name: Wait for pgxntool-test PR
+    runs-on: ubuntu-latest
+    # Hard cap on the job. Our polling logic exits after 5 minutes internally,
+    # but this prevents the job from hanging indefinitely if something goes wrong
+    # in the script itself.
+    timeout-minutes: 8
+    outputs:
+      test-ref: ${{ steps.wait.outputs.test_ref }}
+
+    steps:
+      - name: Find matching pgxntool-test PR and wait for its CI
+        id: wait
+        uses: actions/github-script@v7
+        with:
+          # GITHUB_TOKEN is sufficient for reading public repos. If these repos
+          # are ever made private, replace with a PAT stored as a secret with
+          # 'repo' scope on both repos. Note: PAT expiration causes silent
+          # failures here — the API returns 401 and the job errors out instead
+          # of failing gracefully with a useful message.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+
+            // Master-to-master PRs don't need a corresponding test PR.
+            if (branch === 'master') {
+              core.setOutput('test_ref', 'master');
+              return;
+            }
+
+            const deadline = Date.now() + 5 * 60 * 1000; // 5-minute window
+            let testPR = null;
+
+            core.info(`Searching for pgxntool-test PR with head branch: ${branch}`);
+
+            // Poll for a matching test PR. We wait because contributors typically
+            // open the pgxntool PR first, then the test PR shortly after. Without
+            // this wait, CI would immediately fail for every paired PR.
+            while (!testPR && Date.now() < deadline) {
+              // The GitHub API's 'head' filter requires "owner:branch" format,
+              // but we don't know which fork account the contributor used for
+              // pgxntool-test (it may differ from their pgxntool fork). So we
+              // list all open PRs and filter locally by branch name.
+              const { data: prs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: 'pgxntool-test',
+                state: 'open',
+                per_page: 100
+              });
+
+              const matching = prs.filter(pr => pr.head.ref === branch);
+
+              if (matching.length > 1) {
+                // Multiple open PRs with the same branch name from different
+                // forks. Prefer the one from the same fork owner as this PR.
+                const prOwner = context.payload.pull_request.head.repo?.owner?.login;
+                const sameOwner = matching.find(
+                  pr => pr.head.repo?.owner?.login === prOwner
+                );
+                testPR = sameOwner ?? matching[0];
+                core.info(
+                  `Multiple pgxntool-test PRs match branch '${branch}'; ` +
+                  `using #${testPR.number} from ${testPR.head.repo?.owner?.login}`
+                );
+              } else if (matching.length === 1) {
+                testPR = matching[0];
+              }
+
+              if (!testPR) {
+                const remaining = Math.round((deadline - Date.now()) / 1000);
+                core.info(`No matching PR yet; retrying in 30s (${remaining}s remaining)`);
+                await new Promise(r => setTimeout(r, 30000));
+              }
+            }
+
+            if (!testPR) {
+              // No test PR found. Make a live API call for current labels rather
+              // than reading from the event payload. The payload is a snapshot
+              // from when the workflow was triggered — a maintainer may have
+              // added 'no-test-pr' during our 5-minute wait window.
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number
+              });
+              const hasLabel = pr.labels.some(l => l.name === 'no-test-pr');
+
+              if (hasLabel) {
+                core.info(
+                  "'no-test-pr' label is set; proceeding with pgxntool-test master. " +
+                  "The protect-label workflow ensures only maintainers can set this label."
+                );
+                core.setOutput('test_ref', 'master');
+                return;
+              }
+
+              core.setFailed(
+                `No matching pgxntool-test PR found for branch '${branch}' after 5 minutes, ` +
+                `and no 'no-test-pr' label on this PR.\n\n` +
+                `To fix:\n` +
+                `  - Open a PR in pgxntool-test from a branch also named '${branch}', OR\n` +
+                `  - Ask a maintainer to add the 'no-test-pr' label if no test changes are needed.`
+              );
+              return;
+            }
+
+            core.info(
+              `Found pgxntool-test PR #${testPR.number} at ${testPR.head.sha}. ` +
+              `Waiting for its CI to complete...`
+            );
+
+            const sha = testPR.head.sha;
+
+            while (Date.now() < deadline) {
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: 'pgxntool-test',
+                ref: sha,
+                per_page: 100
+              });
+              const runs = checks.check_runs;
+
+              if (runs.length === 0) {
+                // CI hasn't started yet on the test PR. Normal — GitHub Actions
+                // queueing can take 10-30 seconds. Keep waiting rather than
+                // treating empty check_runs as "all passed".
+                core.info('pgxntool-test CI not yet started; waiting...');
+                await new Promise(r => setTimeout(r, 30000));
+                continue;
+              }
+
+              const incomplete = runs.filter(r => r.status !== 'completed');
+              if (incomplete.length > 0) {
+                core.info(
+                  `${incomplete.length} check(s) still running on ` +
+                  `pgxntool-test PR #${testPR.number}; waiting...`
+                );
+                await new Promise(r => setTimeout(r, 30000));
+                continue;
+              }
+
+              // All checks completed. Evaluate results.
+              // 'success', 'skipped', 'neutral' are non-blocking.
+              // 'failure', 'cancelled', 'timed_out', 'action_required' block.
+              // We do NOT treat 'action_required' as passing — it means a human
+              // must approve something, and auto-unblocking would defeat the
+              // purpose of that gate.
+              const failed = runs.filter(
+                r => !['success', 'skipped', 'neutral'].includes(r.conclusion)
+              );
+
+              if (failed.length > 0) {
+                const names = failed.map(r => `${r.name} (${r.conclusion})`).join(', ');
+                core.setFailed(
+                  `pgxntool-test PR #${testPR.number} CI failed: ${names}\n` +
+                  `Fix the test PR CI before this PR can be merged.`
+                );
+                return;
+              }
+
+              core.info(`pgxntool-test PR #${testPR.number} CI passed`);
+              core.setOutput('test_ref', sha);
+              return;
+            }
+
+            core.setFailed(
+              `Timed out waiting for pgxntool-test PR #${testPR.number} CI to complete. ` +
+              `The test PR may have a stuck or very slow CI run.`
+            );
+
+  test:
+    name: 🐘 PostgreSQL ${{ matrix.pg }}
+    needs: resolve-test-ref
+    runs-on: ubuntu-latest
+    container: pgxn/pgxn-tools
+    strategy:
+      matrix:
+        pg: [17, 16, 15, 14, 13, 12]
+
+    steps:
+      - name: Start PostgreSQL ${{ matrix.pg }}
+        run: pg-start ${{ matrix.pg }}
+
+      - name: Check out pgxntool
+        uses: actions/checkout@v4
+        with:
+          path: pgxntool
+          submodules: false  # pgxntool has no submodules
+
+      - name: Check out pgxntool-test
+        uses: actions/checkout@v4
+        with:
+          repository: Postgres-Extensions/pgxntool-test
+          ref: ${{ needs.resolve-test-ref.outputs.test-ref }}
+          path: pgxntool-test
+          # REQUIRED: pgxntool-test includes BATS as a git submodule at
+          # test/bats/. Without this, every test invocation fails with
+          # "bats: command not found" — an error that looks like a PATH issue.
+          submodules: recursive
+
+      - name: Configure git for CI
+        run: |
+          # The container may run as a different UID than the checkout owner.
+          # Without safe.directory, git refuses to operate with "fatal: dubious
+          # ownership" — causing test failures that look like code bugs.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/pgxntool"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/pgxntool-test"
+
+          # Required for git operations that create commits inside tests.
+          git config --global user.email "ci@github-actions"
+          git config --global user.name "GitHub Actions"
+
+          # actions/checkout leaves HEAD detached. Tests that call 'git subtree
+          # add' need a real local branch, not a detached HEAD. -B force-creates
+          # the branch even if it already exists.
+          cd pgxntool
+          git checkout -B "${{ github.head_ref }}"
+
+      - name: Install dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq \
+            rsync \
+            ruby-asciidoctor \
+            jq
+          # rsync: used throughout test infrastructure; absent rsync causes
+          # failures deep in BATS output that look like test logic bugs.
+          # ruby-asciidoctor: required by check-readme (called during test-setup).
+          # jq: required by assert_valid_meta_json().
+
+      - name: Run tests
+        working-directory: pgxntool-test
+        env:
+          # Bypass test infrastructure's branch auto-detection. In CI, pgxntool
+          # is checked out at a specific ref, not necessarily a remote branch
+          # tip. PGXNBRANCH tells the test infra which branch to treat it as.
+          PGXNBRANCH: ${{ github.head_ref }}
+        run: make test
