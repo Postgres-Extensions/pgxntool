@@ -192,6 +192,12 @@ jobs:
       - name: Start PostgreSQL ${{ matrix.pg }}
         run: pg-start ${{ matrix.pg }}
 
+      - name: Report CI context
+        run: |
+          # Print both repos and exact refs at the top of every job so failures
+          # are easy to correlate to the right code, especially cross-repo issues.
+          echo "=== BRANCHES: pgxntool=${{ github.head_ref }} pgxntool-test=${{ needs.resolve-test-ref.outputs.test-ref }} ==="
+
       - name: Check out pgxntool
         uses: actions/checkout@v4
         with:
@@ -235,13 +241,13 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update -qq
-          apt-get install -y -qq \
-            rsync \
-            ruby-asciidoctor \
-            jq
+          apt-get install -y -qq rsync jq ruby
+          gem install asciidoctor --no-document --quiet
           # rsync: used throughout test infrastructure; absent rsync causes
           # failures deep in BATS output that look like test logic bugs.
-          # ruby-asciidoctor: required by check-readme (called during test-setup).
+          # asciidoctor via gem (not apt ruby-asciidoctor): the apt package
+          # installs the gem but its binary is not on PATH in pgxn-tools
+          # containers. gem install puts it in /usr/local/bin which IS on PATH.
           # jq: required by assert_valid_meta_json().
 
       - name: Run tests
