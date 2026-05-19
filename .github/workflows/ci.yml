@@ -8,6 +8,14 @@ on:
     # from other public repos (no secrets needed), 'pull_request' is correct
     # and safe even for fork PRs.
 
+permissions:
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   check-test-pr:
     name: Check for paired pgxntool-test PR
@@ -40,7 +48,25 @@ jobs:
 
             // master-to-master PRs have no paired test PR by convention.
             // Run tests against pgxntool-test/master directly.
+            //
+            // If a fork PR's branch is named 'master', that's almost certainly
+            // a mistake (contributors should use a feature branch), but we
+            // don't block it — just warn visibly as an annotation on the run.
+            // Note: pull_request gives a read-only token for fork PRs, so we
+            // can't post a PR comment back to the upstream repo from here.
             if (branch === 'master') {
+              const headRepo = context.payload.pull_request.head.repo;
+              const isBaseRepo =
+                headRepo?.owner?.login === context.repo.owner &&
+                headRepo?.name === context.repo.repo;
+              if (!isBaseRepo) {
+                core.warning(
+                  `PR head branch is named 'master' but comes from a fork ` +
+                  `(${headRepo?.full_name ?? 'unknown'}). Contributors should ` +
+                  `use a feature branch, not master. Proceeding with tests ` +
+                  `against pgxntool-test/master.`
+                );
+              }
               core.setOutput('run_tests', 'true');
               core.setOutput('test_ref', 'master');
               return;
@@ -58,7 +84,9 @@ jobs:
             // The GitHub API's 'head' filter requires "owner:branch" format.
             // We list all open PRs and filter locally — safe for repos with
             // few open PRs, and avoids needing to know the fork repo name.
-            const { data: prs } = await github.rest.pulls.list({
+            // paginate() fetches all pages automatically, so this is correct
+            // even if pgxntool-test ever exceeds 100 open PRs (the per_page cap).
+            const prs = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: 'pgxntool-test',
               state: 'open',
@@ -122,13 +150,14 @@ jobs:
               let runs;
 
               while (true) {
-                const { data: checks } = await github.rest.checks.listForRef({
-                  owner: context.repo.owner,
-                  repo: 'pgxntool-test',
-                  ref: sha,
-                  per_page: 100
-                });
-                runs = checks.check_runs;
+                // listForRef wraps results in {check_runs:[], total_count:N}
+                // rather than a plain array, so we provide a map fn to extract
+                // the items. paginate() handles fetching all pages.
+                runs = await github.paginate(
+                  github.rest.checks.listForRef,
+                  { owner: context.repo.owner, repo: 'pgxntool-test', ref: sha, per_page: 100 },
+                  (response) => response.data.check_runs
+                );
 
                 const incomplete = runs.filter(r => r.status !== 'completed');
                 if (runs.length > 0 && incomplete.length === 0) break;
@@ -250,6 +279,5 @@ jobs:
     # -----------------------------------------------------------------------
     uses: Postgres-Extensions/pgxntool-test/.github/workflows/run-tests.yml@add-ci
     with:
-      pgxntool-ref: ${{ github.event.pull_request.head.ref }}
-      pgxntool-test-ref: master
       pgxntool-branch: ${{ github.event.pull_request.head.ref }}
+      pgxntool-test-ref: master
