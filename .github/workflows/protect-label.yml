@@ -21,6 +21,7 @@ jobs:
   protect:
     # Only fire for the label we care about. All other label changes are
     # unaffected by this workflow.
+    # Note: this literal must match the LABEL const defined in the script below.
     if: github.event.label.name == 'commit-with-no-tests'
     runs-on: ubuntu-latest
     permissions:
@@ -35,6 +36,10 @@ jobs:
             const actor = context.actor;
             const prNumber = context.payload.pull_request.number;
             const action = context.payload.action; // 'labeled' or 'unlabeled'
+            // Single source of truth for the label name within this script.
+            // Must also match the literal in the job-level `if:` condition above
+            // (YAML expressions can't reference JS constants).
+            const LABEL = 'commit-with-no-tests';
 
             // When this workflow re-adds or removes the label itself, that fires
             // this event again with actor = 'github-actions[bot]'. Without this
@@ -87,12 +92,12 @@ jobs:
             }
 
             if (action === 'labeled' && !hasWrite) {
-              core.info(`${actor} lacks write access; removing 'commit-with-no-tests' label`);
+              core.info(`${actor} lacks write access; removing '${LABEL}' label`);
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                name: 'commit-with-no-tests'
+                name: LABEL
               });
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -115,12 +120,12 @@ jobs:
               // in practice: the ci.yml workflow reads labels via a live API
               // call (not from its cached payload), so a re-run after the label
               // is restored will pick it up correctly.
-              core.info(`${actor} lacks write access; re-adding 'commit-with-no-tests' label`);
+              core.info(`${actor} lacks write access; re-adding '${LABEL}' label`);
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                labels: ['commit-with-no-tests']
+                labels: [LABEL]
               });
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -134,6 +139,6 @@ jobs:
 
             } else if (hasWrite) {
               core.info(
-                `${actor} has write access; '${action}' on 'commit-with-no-tests' label is approved`
+                `${actor} has write access; '${action}' on '${LABEL}' label is approved`
               );
             }

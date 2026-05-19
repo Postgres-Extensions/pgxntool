@@ -12,9 +12,9 @@ jobs:
   check-test-pr:
     name: Check for paired pgxntool-test PR
     runs-on: ubuntu-latest
-    # This is a fast check — no polling, just a single API call.
-    # If it takes longer than 2 minutes something is wrong with the runner.
-    timeout-minutes: 2
+    # This check polls until the paired pgxntool-test CI run completes
+    # (up to 20 minutes). The job timeout gives a few minutes of headroom.
+    timeout-minutes: 25
     outputs:
       run-tests: ${{ steps.check.outputs.run_tests }}
       test-ref: ${{ steps.check.outputs.test_ref }}
@@ -33,6 +33,10 @@ jobs:
           script: |
             const branch = context.payload.pull_request.head.ref;
             const prNumber = context.payload.pull_request.number;
+            // Single source of truth for the label name. Must also match the
+            // literal string in the protect-label.yml job-level `if:` condition
+            // (YAML expressions can't reference JS constants).
+            const NO_TEST_LABEL = 'commit-with-no-tests';
 
             // master-to-master PRs have no paired test PR by convention.
             // Run tests against pgxntool-test/master directly.
@@ -42,17 +46,18 @@ jobs:
               return;
             }
 
-            // Look for an existing open pgxntool-test PR with the SAME branch
-            // name. No waiting — the test PR must already exist when this check
-            // runs. This keeps the check fast (seconds, not minutes).
+            // The owner of this PR's head repo — the contributor's fork owner
+            // for fork PRs, or the base repo owner for maintainer PRs.
+            // The paired pgxntool-test PR must come from the SAME owner.
+            // We never cross-match PRs across different contributors' forks.
+            const prOwner = context.payload.pull_request.head.repo?.owner?.login;
+
+            // Look for open pgxntool-test PRs with the SAME branch name AND
+            // the same fork owner. Branch names must match exactly.
             //
-            // Branch names must match exactly. If the branch is named 'fix-foo'
-            // in pgxntool, the paired test PR must also be on 'fix-foo'.
-            //
-            // The GitHub API's 'head' filter requires "owner:branch" format and
-            // requires knowing the fork owner. Since a contributor's pgxntool-test
-            // fork may differ from their pgxntool fork, we list all open PRs and
-            // filter locally — a safe approach for repos with few open PRs.
+            // The GitHub API's 'head' filter requires "owner:branch" format.
+            // We list all open PRs and filter locally — safe for repos with
+            // few open PRs, and avoids needing to know the fork repo name.
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: 'pgxntool-test',
@@ -60,26 +65,38 @@ jobs:
               per_page: 100
             });
 
-            const matching = prs.filter(pr => pr.head.ref === branch);
-            let testPR = null;
+            const matching = prs.filter(pr =>
+              pr.head.ref === branch &&
+              pr.head.repo?.owner?.login === prOwner
+            );
+            const testPR = matching.length > 0 ? matching[0] : null;
 
             if (matching.length > 1) {
-              // Multiple open PRs with the same branch name from different
-              // forks. Prefer the one from the same fork owner as this PR.
-              // If no owner match, fall back to the first result.
-              const prOwner = context.payload.pull_request.head.repo?.owner?.login;
-              testPR = matching.find(
-                pr => pr.head.repo?.owner?.login === prOwner
-              ) ?? matching[0];
-              core.info(
-                `Multiple pgxntool-test PRs match branch '${branch}'; ` +
-                `using #${testPR.number} from ${testPR.head.repo?.owner?.login}`
+              core.warning(
+                `Multiple pgxntool-test PRs from ${prOwner} match branch ` +
+                `'${branch}'; using #${testPR.number}.`
               );
-            } else if (matching.length === 1) {
-              testPR = matching[0];
             }
 
             if (testPR) {
+              // Error if the no-test label is also set — that's contradictory.
+              // Re-fetch the PR live (not from payload) in case the label was
+              // added after this workflow was triggered.
+              const { data: currentPR } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              if (currentPR.labels.some(l => l.name === NO_TEST_LABEL)) {
+                core.setFailed(
+                  `PR has the '${NO_TEST_LABEL}' label, but a paired ` +
+                  `pgxntool-test PR #${testPR.number} exists on branch '${branch}'.\n\n` +
+                  `Remove the '${NO_TEST_LABEL}' label — it should only be used ` +
+                  `when there is genuinely no paired test PR.`
+                );
+                return;
+              }
+
               // A paired test PR exists. Verify its CI passed for the exact
               // current HEAD SHA and that the run is recent enough to be valid.
               const sha = testPR.head.sha;
@@ -90,42 +107,60 @@ jobs:
 
               core.info(`Found pgxntool-test PR #${testPR.number} (${sha.slice(0, 7)})`);
 
-              // Fetch check runs for the exact HEAD SHA of the test PR.
-              // Using 'ref: sha' (not branch name) ensures we only see runs
-              // that used this specific commit — never stale runs from an older
-              // push on the same branch.
-              const { data: checks } = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: 'pgxntool-test',
-                ref: sha,
-                per_page: 100
-              });
-              const runs = checks.check_runs;
+              // Poll until all check runs for the exact HEAD SHA complete.
+              // Using 'ref: sha' (not branch name) ensures we only see runs for
+              // this commit — never stale runs from an older push on the same branch.
+              //
+              // We poll rather than fail immediately because both repos are often
+              // pushed close together. When that happens, pgxntool CI starts while
+              // pgxntool-test CI may not have queued yet. We wait up to 20 minutes.
+              const POLL_INTERVAL_MS = 30 * 1000;
+              const MAX_WAIT_MS = 20 * 60 * 1000;
+              const waitStart = Date.now();
+              let runs;
 
-              if (runs.length === 0) {
-                core.setFailed(
-                  `pgxntool-test PR #${testPR.number} has no CI runs for its ` +
-                  `current HEAD (${sha.slice(0, 7)}).\n\n` +
-                  `Push a commit (or re-run CI) on the test PR to trigger its ` +
-                  `CI, then re-run this check:\n` +
-                  `  Test PR:           ${testPRUrl}\n` +
-                  `  Re-run this check: ${recheckUrl}`
-                );
-                return;
-              }
+              while (true) {
+                const { data: checks } = await github.rest.checks.listForRef({
+                  owner: context.repo.owner,
+                  repo: 'pgxntool-test',
+                  ref: sha,
+                  per_page: 100
+                });
+                runs = checks.check_runs;
 
-              // If CI is still running, tell the user to wait and re-run.
-              const incomplete = runs.filter(r => r.status !== 'completed');
-              if (incomplete.length > 0) {
-                const names = incomplete.map(r => r.name).join(', ');
-                core.setFailed(
-                  `pgxntool-test PR #${testPR.number} CI is still running ` +
-                  `for SHA ${sha.slice(0, 7)}: ${names}\n\n` +
-                  `Wait for the test PR CI to finish, then re-run this check:\n` +
-                  `  Test PR:           ${testPRUrl}\n` +
-                  `  Re-run this check: ${recheckUrl}`
-                );
-                return;
+                const incomplete = runs.filter(r => r.status !== 'completed');
+                if (runs.length > 0 && incomplete.length === 0) break;
+
+                const elapsed = Date.now() - waitStart;
+                if (elapsed >= MAX_WAIT_MS) {
+                  const mins = Math.round(elapsed / 60000);
+                  if (runs.length === 0) {
+                    core.setFailed(
+                      `pgxntool-test PR #${testPR.number} has no CI runs for ` +
+                      `SHA ${sha.slice(0, 7)} after waiting ${mins} min.\n\n` +
+                      `Push a commit (or manually re-run CI) on the test PR:\n` +
+                      `  Test PR:           ${testPRUrl}\n` +
+                      `  Re-run this check: ${recheckUrl}`
+                    );
+                  } else {
+                    const names = incomplete.map(r => r.name).join(', ');
+                    core.setFailed(
+                      `pgxntool-test PR #${testPR.number} CI did not finish within ` +
+                      `${mins} min for SHA ${sha.slice(0, 7)}: ${names}\n\n` +
+                      `  Test PR:           ${testPRUrl}\n` +
+                      `  Re-run this check: ${recheckUrl}`
+                    );
+                  }
+                  return;
+                }
+
+                if (runs.length === 0) {
+                  core.info(`No CI runs yet for pgxntool-test PR #${testPR.number} (${sha.slice(0, 7)}); waiting 30s...`);
+                } else {
+                  const names = incomplete.map(r => r.name).join(', ');
+                  core.info(`pgxntool-test CI still running (${names}); waiting 30s...`);
+                }
+                await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
               }
 
               // All checks complete — look for failures.
@@ -178,9 +213,9 @@ jobs:
               return;
             }
 
-            // No paired test PR found. Check for the 'commit-with-no-tests'
-            // label, which a maintainer can apply when a pgxntool change
-            // genuinely needs no test changes (unusual).
+            // No paired test PR found. Check for the NO_TEST_LABEL label,
+            // which a maintainer can apply when a pgxntool change genuinely
+            // needs no test changes (unusual).
             //
             // We make a live API call rather than reading from the event
             // payload. The payload is a snapshot from when this workflow was
@@ -191,9 +226,9 @@ jobs:
               pull_number: prNumber
             });
 
-            if (pr.labels.some(l => l.name === 'commit-with-no-tests')) {
+            if (pr.labels.some(l => l.name === NO_TEST_LABEL)) {
               core.info(
-                "'commit-with-no-tests' label is present; running tests " +
+                `'${NO_TEST_LABEL}' label is present; running tests ` +
                 "against pgxntool-test/master. The protect-label workflow " +
                 "ensures only maintainers can apply this label."
               );
@@ -206,14 +241,14 @@ jobs:
             // Fail with a clear, actionable message.
             core.setFailed(
               `No paired pgxntool-test PR found for branch '${branch}', ` +
-              `and no 'commit-with-no-tests' label on this PR.\n\n` +
+              `and no '${NO_TEST_LABEL}' label on this PR.\n\n` +
               `pgxntool changes should always be paired with matching test\n` +
               `changes in pgxntool-test. This check enforces that pairing.\n\n` +
               `To resolve:\n` +
               `  1. Open a PR in pgxntool-test from a branch ALSO named '${branch}'.\n` +
               `     Branch names must match exactly for the pairing to work.\n\n` +
               `  2. If this pgxntool change truly needs no test updates (unusual),\n` +
-              `     ask a maintainer to apply the 'commit-with-no-tests' label.\n` +
+              `     ask a maintainer to apply the '${NO_TEST_LABEL}' label.\n` +
               `     Only maintainers can apply this label. It is not a normal\n` +
               `     shortcut — most pgxntool changes require test updates.\n\n` +
               `See: https://github.com/Postgres-Extensions/pgxntool-test#ci-and-contributing`
