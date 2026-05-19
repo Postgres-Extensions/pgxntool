@@ -69,14 +69,16 @@ jobs:
               pr.head.ref === branch &&
               pr.head.repo?.owner?.login === prOwner
             );
-            const testPR = matching.length > 0 ? matching[0] : null;
-
             if (matching.length > 1) {
-              core.warning(
-                `Multiple pgxntool-test PRs from ${prOwner} match branch ` +
-                `'${branch}'; using #${testPR.number}.`
+              core.setFailed(
+                `Multiple open pgxntool-test PRs from ${prOwner} match branch ` +
+                `'${branch}'. Cannot determine which one to use.\n\n` +
+                `Close all but one, then re-run this check.`
               );
+              return;
             }
+
+            const testPR = matching.length === 1 ? matching[0] : null;
 
             if (testPR) {
               // Error if the no-test label is also set — that's contradictory.
@@ -180,33 +182,9 @@ jobs:
                 return;
               }
 
-              // Verify the passing run is recent (within 7 days).
-              // Stale CI results may not reflect the current state of
-              // dependencies or the pgxn-tools container image.
-              const MAX_AGE_DAYS = 7;
-              const mostRecent = runs.reduce((a, b) =>
-                new Date(a.completed_at) > new Date(b.completed_at) ? a : b
-              );
-              const completedAt = new Date(mostRecent.completed_at);
-              const ageDays = (Date.now() - completedAt.getTime()) / 86400000;
-
-              if (ageDays > MAX_AGE_DAYS) {
-                core.setFailed(
-                  `pgxntool-test PR #${testPR.number} CI passed for ` +
-                  `SHA ${sha.slice(0, 7)} but the run is ${Math.round(ageDays)} ` +
-                  `days old (completed: ${completedAt.toISOString()}).\n\n` +
-                  `CI results older than ${MAX_AGE_DAYS} days are not accepted.\n` +
-                  `Push a commit or re-run CI on the test PR to refresh:\n` +
-                  `  Test PR:           ${testPRUrl}\n` +
-                  `  Re-run this check: ${recheckUrl}`
-                );
-                return;
-              }
-
-              const ageHours = Math.round(ageDays * 24);
               core.info(
                 `pgxntool-test PR #${testPR.number} CI passed for ` +
-                `SHA ${sha.slice(0, 7)} (${ageHours}h ago) — tests run there, not here.`
+                `SHA ${sha.slice(0, 7)} — tests run there, not here.`
               );
               core.setOutput('run_tests', 'false');
               core.setOutput('test_ref', sha);
@@ -254,6 +232,19 @@ jobs:
               `See: https://github.com/Postgres-Extensions/pgxntool-test#ci-and-contributing`
             );
 
+  # ============================================================
+  # WARNING: DUPLICATED JOB — KEEP IN SYNC WITH pgxntool-test
+  # ============================================================
+  # This job is an exact copy of the 'test' job in:
+  #   Postgres-Extensions/pgxntool-test/.github/workflows/ci.yml
+  #
+  # It only runs when the 'commit-with-no-tests' label is set (no paired
+  # test PR). In all other cases, tests run in pgxntool-test's CI.
+  #
+  # TODO: Replace this duplication with a GitHub Actions reusable workflow
+  # (workflow_call) once the reusable workflow lands on pgxntool-test/master.
+  # See: https://docs.github.com/en/actions/sharing-automations/reusing-workflows
+  # ============================================================
   test:
     name: 🐘 PostgreSQL ${{ matrix.pg }}
     needs: check-test-pr
