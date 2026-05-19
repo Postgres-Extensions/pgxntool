@@ -235,8 +235,12 @@ jobs:
   test:
     needs: check-test-pr
     if: needs.check-test-pr.outputs.run-tests == 'true'
-    uses: Postgres-Extensions/pgxntool-test/.github/workflows/run-tests.yml@${{ needs.check-test-pr.outputs.test-ref }}
+    # test-ref is always 'master' when this job runs (only the
+    # commit-with-no-tests path sets run-tests=true, and that path always
+    # sets test-ref=master). GitHub Actions does not support expressions in
+    # the uses: field, so we hardcode @master here.
+    uses: Postgres-Extensions/pgxntool-test/.github/workflows/run-tests.yml@master
     with:
       pgxntool-ref: ${{ github.event.pull_request.head.ref }}
-      pgxntool-test-ref: ${{ needs.check-test-pr.outputs.test-ref }}
+      pgxntool-test-ref: master
       pgxntool-branch: ${{ github.event.pull_request.head.ref }}
