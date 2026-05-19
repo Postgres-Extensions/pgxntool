@@ -150,14 +150,17 @@ jobs:
               let runs;
 
               while (true) {
-                // listForRef wraps results in {check_runs:[], total_count:N}
-                // rather than a plain array, so we provide a map fn to extract
-                // the items. paginate() handles fetching all pages.
-                runs = await github.paginate(
-                  github.rest.checks.listForRef,
-                  { owner: context.repo.owner, repo: 'pgxntool-test', ref: sha, per_page: 100 },
-                  (response) => response.data.check_runs
-                );
+                // per_page: 100 is intentional here — a single commit will
+                // not realistically have 100+ CI check runs, so pagination
+                // is unnecessary. (pulls.list uses paginate() above because
+                // an active repo could have many open PRs.)
+                const { data: checks } = await github.rest.checks.listForRef({
+                  owner: context.repo.owner,
+                  repo: 'pgxntool-test',
+                  ref: sha,
+                  per_page: 100
+                });
+                runs = checks.check_runs;
 
                 const incomplete = runs.filter(r => r.status !== 'completed');
                 if (runs.length > 0 && incomplete.length === 0) break;
