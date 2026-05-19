@@ -235,12 +235,19 @@ jobs:
   test:
     needs: check-test-pr
     if: needs.check-test-pr.outputs.run-tests == 'true'
-    # test-ref is always 'master' when this job runs (only the
-    # commit-with-no-tests path sets run-tests=true, and that path always
-    # sets test-ref=master). GitHub Actions does not support expressions in
-    # the uses: field, so we hardcode the ref.
-    # TODO: change @add-ci to @master when pgxntool-test/add-ci is merged
-    # (run-tests.yml doesn't exist on master yet during development).
+    # -----------------------------------------------------------------------
+    # CROSS-REPO REUSABLE WORKFLOW — READ BEFORE CHANGING THIS REF
+    # See: .github/workflows/CLAUDE.md for full architecture notes.
+    #
+    # The ref (@add-ci / @master) must be a static string — GitHub Actions
+    # does not support expressions in uses:. During development on a feature
+    # branch the ref is @<branch> so CI can find run-tests.yml before it
+    # lands on master. Before this PR merges, two things must happen:
+    #   1. pgxntool-test/<branch> merges to master first
+    #   2. This ref is updated from @<branch> to @master
+    #
+    # CURRENT REF: @add-ci (temporary — pgxntool-test/add-ci not yet merged)
+    # -----------------------------------------------------------------------
     uses: Postgres-Extensions/pgxntool-test/.github/workflows/run-tests.yml@add-ci
     with:
       pgxntool-ref: ${{ github.event.pull_request.head.ref }}
