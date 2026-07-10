@@ -482,26 +482,27 @@ print-%	: ; $(info $* is $(flavor $*) variable set to "$($*)") @true
 #
 # subtree sync support
 #
-# This is setup to allow any number of pull targets by defining special
-# variables. pgxntool-sync-release is an example of this.
+# All the real work (git subtree pull + update-setup-files.sh) lives in
+# pgxntool/pgxntool-sync.sh so it can be run directly, without make. These
+# targets are thin wrappers around that script.
 #
-# After the subtree pull, we run update-setup-files.sh to handle files that
-# were initially copied by setup.sh (like .gitignore). This script does a
-# 3-way merge if both you and pgxntool changed the file.
-.PHONY: pgxntool-sync-%
+# `make pgxntool-sync` pulls the latest released version from the canonical
+# repository (the script's built-in default).
+#
+# `make pgxntool-sync-<name>` pulls from the "<repo> <ref>" defined by the
+# pgxntool-sync-<name> variable, allowing any number of custom pull sources.
+.PHONY: pgxntool-sync pgxntool-sync-%
+pgxntool-sync:
+	@pgxntool/pgxntool-sync.sh
 pgxntool-sync-%:
-	@old_commit=$$(git log -1 --format=%H -- pgxntool/) && \
-	git subtree pull -P pgxntool --squash -m "Pull pgxntool from $($@)" $($@) && \
-	pgxntool/update-setup-files.sh "$$old_commit"
-pgxntool-sync: pgxntool-sync-release
+	@pgxntool/pgxntool-sync.sh $($@)
 
 # DANGER! Use these with caution. They may add extra crap to your history and
 # could make resolving merges difficult!
-pgxntool-sync-release	:= git@github.com:decibel/pgxntool.git release
-pgxntool-sync-stable	:= git@github.com:decibel/pgxntool.git stable
-pgxntool-sync-master	:= git@github.com:decibel/pgxntool.git master
+# The `release` tag is a floating tag that always points at the latest release.
+pgxntool-sync-upstream		:= https://github.com/Postgres-Extensions/pgxntool.git release
+pgxntool-sync-upstream-master	:= https://github.com/Postgres-Extensions/pgxntool.git master
 pgxntool-sync-local		:= ../pgxntool release # Not the same as PGXNTOOL_DIR!
-pgxntool-sync-local-stable	:= ../pgxntool stable # Not the same as PGXNTOOL_DIR!
 pgxntool-sync-local-master	:= ../pgxntool master # Not the same as PGXNTOOL_DIR!
 
 # PGXS doesn't provide any special support for distclean (it just depends on
