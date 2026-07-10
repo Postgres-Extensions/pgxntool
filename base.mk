@@ -499,11 +499,12 @@ pgxntool-sync-%:
 
 # DANGER! Use these with caution. They may add extra crap to your history and
 # could make resolving merges difficult!
-# The `release` tag is a floating tag that always points at the latest release.
-pgxntool-sync-upstream		:= https://github.com/Postgres-Extensions/pgxntool.git release
-pgxntool-sync-upstream-master	:= https://github.com/Postgres-Extensions/pgxntool.git master
-pgxntool-sync-local		:= ../pgxntool release # Not the same as PGXNTOOL_DIR!
-pgxntool-sync-local-master	:= ../pgxntool master # Not the same as PGXNTOOL_DIR!
+# `pgxntool-sync` (no suffix) already pulls the canonical release; these are the
+# alternatives. `-master` pulls the bleeding edge; `-local*` pull from a sibling
+# ../pgxntool checkout (not the same as PGXNTOOL_DIR!).
+pgxntool-sync-master		:= https://github.com/Postgres-Extensions/pgxntool.git master
+pgxntool-sync-local		:= ../pgxntool release
+pgxntool-sync-local-master	:= ../pgxntool master
 
 # PGXS doesn't provide any special support for distclean (it just depends on
 # clean), so we roll our own. Files that should only be removed by distclean
