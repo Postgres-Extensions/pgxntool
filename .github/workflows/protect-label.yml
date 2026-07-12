@@ -30,7 +30,9 @@ jobs:
 
     steps:
       - name: Enforce write-access-only on 'commit-with-no-tests' label
-        uses: actions/github-script@v7
+        # Pinned to an immutable SHA: this workflow runs as pull_request_target
+        # with write access, so a moved upstream tag must not change what runs.
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const actor = context.actor;

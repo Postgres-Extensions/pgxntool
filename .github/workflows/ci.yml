@@ -9,6 +9,7 @@ on:
     # and safe even for fork PRs.
 
 permissions:
+  contents: read        # required by actions/checkout in the reusable test workflow
   pull-requests: read
   checks: read
 
@@ -30,7 +31,8 @@ jobs:
     steps:
       - name: Find paired pgxntool-test PR or check commit-with-no-tests label
         id: check
-        uses: actions/github-script@v7
+        # Pinned to an immutable SHA (supply-chain hardening); comment tracks the tag.
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           # GITHUB_TOKEN is sufficient for reading public repos. If these repos
           # are ever made private, replace with a PAT stored as a secret with
@@ -54,7 +56,10 @@ jobs:
             // don't block it — just warn visibly as an annotation on the run.
             // Note: pull_request gives a read-only token for fork PRs, so we
             // can't post a PR comment back to the upstream repo from here.
-            if (branch === 'master') {
+            // Gate on the BASE branch too: this shortcut is only for
+            // master-to-master PRs. A PR from master into some other base must
+            // still go through the normal paired-test lookup below.
+            if (branch === 'master' && context.payload.pull_request.base.ref === 'master') {
               const headRepo = context.payload.pull_request.head.repo;
               const isBaseRepo =
                 headRepo?.owner?.login === context.repo.owner &&
@@ -255,8 +260,9 @@ jobs:
               `pgxntool changes should always be paired with matching test\n` +
               `changes in pgxntool-test. This check enforces that pairing.\n\n` +
               `To resolve:\n` +
-              `  1. Open a PR in pgxntool-test from a branch ALSO named '${branch}'.\n` +
-              `     Branch names must match exactly for the pairing to work.\n\n` +
+              `  1. Open a PR in pgxntool-test from the SAME account (${prOwner}),\n` +
+              `     on a branch ALSO named '${branch}'. Both the branch name and\n` +
+              `     the head owner must match exactly for the pairing to work.\n\n` +
               `  2. If this pgxntool change truly needs no test updates (unusual),\n` +
               `     ask a maintainer to apply the '${NO_TEST_LABEL}' label.\n` +
               `     Only maintainers can apply this label. It is not a normal\n` +
