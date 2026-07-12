@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CI Monitoring After Every Push
+
+**REQUIRED**: After every `git push`, immediately start a background task to
+monitor the CI run for that push. If you pushed to both pgxntool and
+pgxntool-test, start a background task for each repo — do not monitor them
+sequentially.
+
+The CI monitor lives in the pgxntool-test checkout: run
+`bash ../pgxntool-test/.claude/skills/ci/scripts/monitor-ci.sh` (the `/ci`
+skill). It monitors both repos and derives the owner from the current repo.
+Pass the exact push SHA when available — `gh run list --branch` has a race
+condition: if two pushes land close together on the same branch, `--branch`
+may pick up the wrong run. `--commit SHA` targets the exact push and avoids it.
+
 ## Scope of This File
 
 The guidance in this CLAUDE.md applies to pgxntool's own source files and provides
