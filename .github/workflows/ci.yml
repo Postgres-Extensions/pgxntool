@@ -12,6 +12,7 @@ permissions:
   contents: read        # required by actions/checkout in the reusable test workflow
   pull-requests: read
   checks: read
+  actions: read          # list the paired PR's own CI workflow runs (check-test-pr)
 
 concurrency:
   group: ci-pr-${{ github.event.pull_request.number }}
@@ -142,9 +143,11 @@ jobs:
 
               core.info(`Found pgxntool-test PR #${testPR.number} (${sha.slice(0, 7)})`);
 
-              // Poll until all check runs for the exact HEAD SHA complete.
-              // Using 'ref: sha' (not branch name) ensures we only see runs for
-              // this commit — never stale runs from an older push on the same branch.
+              // Poll until all of ci.yml's own check runs for the exact HEAD SHA
+              // complete (see the workflow-filtering note below for why only
+              // ci.yml's runs count). Using 'ref: sha' (not branch name) ensures
+              // we only see runs for this commit — never stale runs from an
+              // older push on the same branch.
               //
               // We poll rather than fail immediately because both repos are often
               // pushed close together. When that happens, pgxntool CI starts while
@@ -155,6 +158,27 @@ jobs:
               let runs;
 
               while (true) {
+                // Only check runs belonging to pgxntool-test's OWN "ci.yml" workflow
+                // run for this SHA are blocking. Other workflows on the same SHA
+                // (claude-code-review.yml's `claude-review`, claude.yml, any future
+                // review bot) are not part of the real test gate and must never
+                // fail this check — filtering by workflow (rather than by job/check
+                // name substring) means a renamed or added ci.yml job is
+                // automatically included with no change needed here, while bot
+                // workflows stay excluded regardless of what they're named.
+                //
+                // A check run's `check_suite.id` identifies which workflow run
+                // produced it, so we resolve ci.yml's run(s) for this SHA first and
+                // then keep only the check runs sharing one of those check suites.
+                const { data: ciRuns } = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: 'pgxntool-test',
+                  workflow_id: 'ci.yml',
+                  head_sha: sha,
+                  per_page: 100
+                });
+                const ciCheckSuiteIds = new Set(ciRuns.workflow_runs.map(r => r.check_suite_id));
+
                 // per_page: 100 is intentional here — a single commit will
                 // not realistically have 100+ CI check runs, so pagination
                 // is unnecessary. (pulls.list uses paginate() above because
@@ -165,7 +189,7 @@ jobs:
                   ref: sha,
                   per_page: 100
                 });
-                runs = checks.check_runs;
+                runs = checks.check_runs.filter(r => ciCheckSuiteIds.has(r.check_suite.id));
 
                 const incomplete = runs.filter(r => r.status !== 'completed');
                 if (runs.length > 0 && incomplete.length === 0) break;
@@ -202,8 +226,10 @@ jobs:
                 await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
               }
 
-              // All checks complete — look for failures.
-              // 'success', 'skipped', 'neutral' are non-blocking.
+              // All of ci.yml's checks are complete — look for failures.
+              // 'success', 'skipped', 'neutral' are non-blocking. Non-ci.yml checks
+              // (review bots, etc.) were already excluded from `runs` above, so a
+              // failure here can only be an actual pgxntool-test CI failure.
               const failed = runs.filter(
                 r => !['success', 'skipped', 'neutral'].includes(r.conclusion)
               );
