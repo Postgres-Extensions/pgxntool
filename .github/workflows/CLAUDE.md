@@ -21,6 +21,16 @@ When a maintainer applies the `commit-with-no-tests` label (and no paired test P
 exists), the `test` job runs tests directly in pgxntool CI against pgxntool-test/master.
 This is the rare exception, not the norm.
 
+## Doc-only bypass
+
+`check-test-pr` checks this first, before the paired-test-PR lookup or the
+`commit-with-no-tests` label: if every changed file in the PR is pure
+documentation (`*.md`, `*.asc`, `*.adoc`, `*.asciidoc`, anywhere including
+under `.claude/`, but never under `.github/` — workflow definitions carry
+real behavioral weight regardless of extension), it skips both the paired
+branch requirement and the `test` job entirely. `claude-code-review.yml` is
+a separate workflow gated by its own `if:` and always still runs.
+
 ## Cross-repo reusable workflow — tradeoffs and constraints
 
 The `test` job calls a reusable workflow from pgxntool-test:

@@ -48,6 +48,42 @@ jobs:
             // (YAML expressions can't reference JS constants).
             const NO_TEST_LABEL = 'commit-with-no-tests';
 
+            // DOC-ONLY BYPASS: skip both the paired-test-PR requirement and
+            // the actual Postgres test run when every changed file is pure
+            // documentation. This is independent of, and takes priority
+            // over, everything below — a doc-only PR needs neither a paired
+            // branch nor the NO_TEST_LABEL override.
+            //
+            // Files under .github/ are never doc-only even if their
+            // extension matches (they're workflow definitions with real
+            // behavioral weight, some running with pull_request_target
+            // privileges). Everything else — including .claude/*.md prompt
+            // and command docs, which carry no execution weight themselves
+            // — counts.
+            //
+            // This does NOT skip claude-review: that's a separate workflow
+            // gated by its own `if:`, unaffected by this check's outputs.
+            const DOC_EXTENSIONS = /\.(md|asc|adoc|asciidoc)$/i;
+            const changedFiles = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+            const isDocOnly = changedFiles.length > 0 && changedFiles.every(f =>
+              DOC_EXTENSIONS.test(f.filename) && !f.filename.startsWith('.github/')
+            );
+            if (isDocOnly) {
+              core.info(
+                `All ${changedFiles.length} changed file(s) are documentation-only ` +
+                `(matched ${DOC_EXTENSIONS}, none under .github/); skipping the ` +
+                `paired-test-PR requirement and the Postgres test matrix.`
+              );
+              core.setOutput('run_tests', 'false');
+              core.setOutput('test_ref', '');
+              return;
+            }
+
             // master-to-master PRs have no paired test PR by convention.
             // Run tests against pgxntool-test/master directly.
             //
