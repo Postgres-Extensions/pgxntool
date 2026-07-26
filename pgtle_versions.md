@@ -23,9 +23,10 @@ This file documents pg_tle version boundaries that affect pgxntool's pg_tle supp
 
 ## Key API Changes by Version
 
-**1.4.0:** Added alignment/storage parameters to `pgtle.create_base_type()` (see Features above)
+**1.4.0:** Added alignment/storage parameters to `pgtle.create_base_type()`
 
-**1.5.0:** Changed `pgtle.install_extension()` signature
+**1.5.0**
+- Changed `pgtle.install_extension()` signature
 - Added required `schema` parameter
 - Dropped PostgreSQL 11 support
 
