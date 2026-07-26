@@ -37,7 +37,7 @@ control.mk: $(PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOO
 
 -include control.mk
 
-DATA         = $(EXTENSION_VERSION_FILES) $(wildcard sql/*--*--*.sql)
+DATA         = $(EXTENSION__CURRENT_VERSION__FILES) $(wildcard sql/*--*--*.sql)
 DOC_DIRS	+= doc
 # NOTE: if this is empty it gets forcibly defined to NUL before including PGXS
 DOCS		+= $(foreach dir,$(DOC_DIRS),$(wildcard $(dir)/*))
@@ -206,7 +206,7 @@ test		 = $(shell test $(1) $(2) $(3) && echo yes || echo no)
 GE91		 = $(call test, $(MAJORVER), -ge, 91)
 
 ifeq ($(GE91),yes)
-all: $(EXTENSION_VERSION_FILES)
+all: $(EXTENSION__CURRENT_VERSION__FILES)
 endif
 
 ifeq ($(call test, $(MAJORVER), -lt, 130), yes)
@@ -326,7 +326,7 @@ PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
 
 # Main target
 # Depend on 'all' to ensure versioned SQL files are generated first
-# Depend on control.mk (which defines EXTENSION_VERSION_FILES)
+# Depend on control.mk (which defines EXTENSION__CURRENT_VERSION__FILES)
 # Depend on control files explicitly so changes trigger rebuilds
 # Generates all supported pg_tle versions for each extension
 .PHONY: pgtle
