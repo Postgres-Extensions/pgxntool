@@ -191,6 +191,41 @@ endif
 # Default mode: pgtap (scans results/*.out for TAP failures)
 PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
 
+# ------------------------------------------------------------------------------
+# check-stale-expected: catch orphaned/unexpected test/expected/ files
+# ------------------------------------------------------------------------------
+# Variable: PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED
+#   - Can be set manually in Makefile or command line
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: "yes" (enabled by default for all pgxntool projects)
+#   - Set to "no" to make this check a complete no-op: the target is
+#     dropped from TEST_DEPS entirely (see its own definition below)
+#
+# Variable: PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
+#   - Sub-check, independent of the variable above: fails if test/expected/
+#     (or test/build/expected/) contains any file that isn't *.out
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: "yes"
+#   - Set to "no" to disable just this sub-check while leaving the rest of
+#     check-stale-expected (the orphaned-.out check) active
+#   - Passed through to check-stale-expected.sh; see that script for the
+#     distinct error message/exit code this sub-check uses
+#
+# Implementation: See check-stale-expected target definition (search for
+# "check-stale-expected:" in this file)
+#
+ifdef PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED
+  override PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED)
+else
+  PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED = yes
+endif
+
+ifdef PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
+  override PGXNTOOL_CHECK_EXPECTED_FILE_TYPES := $(call pgxntool_validate_yesno,$(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES),PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
+else
+  PGXNTOOL_CHECK_EXPECTED_FILE_TYPES = yes
+endif
+
 # Generate unique database name for tests to prevent conflicts across projects
 # Uses project name + first 5 chars of md5 hash of current directory
 # This prevents multiple test runs in different directories from clobbering each other
@@ -271,8 +306,14 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 #
 # These targets are meant to make running tests easier.
 
+# Build test dependencies list based on enabled features. This base
+# assignment (a plain `=`, not `+=`) must come before any `TEST_DEPS +=`
+# line below -- Make processes the file top-to-bottom, and a later plain
+# `=` would silently wipe out any `+=` that came before it.
+TEST_DEPS = testdeps
+
 # ------------------------------------------------------------------------------
-# check-stale-expected: catch orphaned test/expected/ files
+# check-stale-expected: catch orphaned/unexpected test/expected/ files
 # ------------------------------------------------------------------------------
 # Purpose: test/expected/*.out must mirror test/sql/*.sql 1:1 (likewise
 # test/build/expected/*.out vs test/build/*.sql, when test-build is in use).
@@ -286,9 +327,15 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # independent prerequisites of `test`, and Make does not guarantee the order
 # unrelated prerequisites of the same target are built in. An explicit
 # dependency edge is the only ordering guarantee Make actually gives.
+#
+# See PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED / PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
+# above for how to disable this entirely or just its non-.out file sub-check.
+ifeq ($(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),yes)
 .PHONY: check-stale-expected
 check-stale-expected: installcheck
-	@$(PGXNTOOL_DIR)/check-stale-expected.sh $(TESTDIR)
+	@PGXNTOOL_CHECK_EXPECTED_FILE_TYPES=$(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES) $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh $(TESTDIR)
+TEST_DEPS += check-stale-expected
+endif
 
 # make test: run any test dependencies, then do a `make install installcheck`.
 # If regressions are found, it will output them.
@@ -297,12 +344,10 @@ check-stale-expected: installcheck
 # watch-make if you're generating intermediate files. If tests end up needing
 # clean it's an indication of a missing dependency anyway.
 .PHONY: test
-# Build test dependencies list based on enabled features
-TEST_DEPS = testdeps
 ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_DEPS += test-build
 endif
-TEST_DEPS += install installcheck check-stale-expected
+TEST_DEPS += install installcheck
 test: $(TEST_DEPS)
 	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; fi
 
