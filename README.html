@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="generator" content="Asciidoctor 2.0.23">
+<meta name="generator" content="Asciidoctor 2.0.20">
 <meta name="author" content="Easier PGXN development">
 <title>PGXNtool</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
@@ -141,7 +141,7 @@ p a>code:hover{color:rgba(0,0,0,.9)}
 #content::before{content:none}
 #header>h1:first-child{color:rgba(0,0,0,.85);margin-top:2.25rem;margin-bottom:0}
 #header>h1:first-child+#toc{margin-top:8px;border-top:1px solid #dddddf}
-#header>h1:only-child{border-bottom:1px solid #dddddf;padding-bottom:8px}
+#header>h1:only-child,body.toc2 #header>h1:nth-last-child(2){border-bottom:1px solid #dddddf;padding-bottom:8px}
 #header .details{border-bottom:1px solid #dddddf;line-height:1.45;padding-top:.25em;padding-bottom:.25em;padding-left:.25em;color:rgba(0,0,0,.6);display:flex;flex-flow:row wrap}
 #header .details span:first-child{margin-left:-.125em}
 #header .details span.email a{color:rgba(0,0,0,.85)}
@@ -163,7 +163,6 @@ p a>code:hover{color:rgba(0,0,0,.9)}
 #toctitle{color:#7a2518;font-size:1.2em}
 @media screen and (min-width:768px){#toctitle{font-size:1.375em}
 body.toc2{padding-left:15em;padding-right:0}
-body.toc2 #header>h1:nth-last-child(2){border-bottom:1px solid #dddddf;padding-bottom:8px}
 #toc.toc2{margin-top:0!important;background:#f8f8f7;position:fixed;width:15em;left:0;top:0;border-right:1px solid #e7e7e9;border-top-width:0!important;border-bottom-width:0!important;z-index:1000;padding:1.25em 1em;height:100%;overflow:auto}
 #toc.toc2 #toctitle{margin-top:0;margin-bottom:.8rem;font-size:1.2em}
 #toc.toc2>ul{font-size:.9em;margin-bottom:0}
@@ -329,7 +328,7 @@ a.image{text-decoration:none;display:inline-block}
 a.image object{pointer-events:none}
 sup.footnote,sup.footnoteref{font-size:.875em;position:static;vertical-align:super}
 sup.footnote a,sup.footnoteref a{text-decoration:none}
-sup.footnote a:active,sup.footnoteref a:active,#footnotes .footnote a:first-of-type:active{text-decoration:underline}
+sup.footnote a:active,sup.footnoteref a:active{text-decoration:underline}
 #footnotes{padding-top:.75em;padding-bottom:.75em;margin-bottom:.625em}
 #footnotes hr{width:20%;min-width:6.25em;margin:-.25em 0 .75em;border-width:1px 0 0}
 #footnotes .footnote{padding:0 .375em 0 .225em;line-height:1.3334;font-size:.875em;margin-left:1.2em;margin-bottom:.2em}
@@ -492,6 +491,8 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_troubleshooting">7.7. Troubleshooting</a></li>
 </ul>
 </li>
+<li><a href="#_configuration_variables">8. Configuration Variables</a></li>
+<li><a href="#_copyright">9. Copyright</a></li>
 </ul>
 </div>
 </div>
@@ -1497,11 +1498,86 @@ This is only a basic example. Always refer to the <a href="https://github.com/aw
 </td>
 <td class="content">
 there are several untrusted languages (such as plpython), and the only tests for C.
-== Copyright
-Copyright (c) 2026 Jim Nasby &lt;<a href="mailto:Jim.Nasby@gmail.com">Jim.Nasby@gmail.com</a>&gt;
 </td>
 </tr>
 </table>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuration_variables"><a class="anchor" href="#_configuration_variables"></a><a class="link" href="#_configuration_variables">8. Configuration Variables</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This is the comprehensive list of make variables you can override to customize pgxntool&#8217;s behavior, either in your Makefile (before <code>include pgxntool/base.mk</code>) or on the <code>make</code> command line. Several of these are also covered in more detail in the sections above; this section exists so there&#8217;s one place that lists all of them.</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1">PGXN_REMOTE</dt>
+<dd>
+<p>Default: <code>origin</code>.
+The git remote used by <code>tag</code>, <code>rmtag</code>, <code>forcetag</code>, and <code>dist</code> (which depends on <code>tag</code>). If your <code>origin</code> is a personal fork rather than the canonical repository&#8201;&#8212;&#8201;for example, if you develop on a fork and only push release tags to the canonical repo&#8201;&#8212;&#8201;set this so tagging and pushing target the right remote:</p>
+<div class="listingblock">
+<div class="content">
+<pre>make dist PGXN_REMOTE=upstream</pre>
+</div>
+</div>
+</dd>
+<dt class="hdlist1">ASCIIDOC</dt>
+<dd>
+<p>Default: auto-detected, the first of <code>asciidoctor</code> or <code>asciidoc</code> found on <code>PATH</code>.
+Path to the Asciidoc processor used to build <code>.html</code> files from <code>$(ASCIIDOC_EXTS)</code> source files. Override if the processor you want isn&#8217;t first on <code>PATH</code>, or isn&#8217;t on <code>PATH</code> at all. See <a href="#_document_handling">Document Handling</a>.</p>
+</dd>
+<dt class="hdlist1">PG_CONFIG</dt>
+<dd>
+<p>Default: <code>pg_config</code>.
+Path to the <code>pg_config</code> binary used to detect the PostgreSQL version and locate PGXS. Override when the right <code>pg_config</code> isn&#8217;t the one on <code>PATH</code>, such as when testing against a specific PostgreSQL install.</p>
+</dd>
+<dt class="hdlist1">TESTDIR</dt>
+<dd>
+<p>Default: <code>test</code>.
+Root directory for test input files: <code>$(TESTDIR)/sql/</code>, <code>$(TESTDIR)/expected/</code>, <code>$(TESTDIR)/build/</code>, <code>$(TESTDIR)/install/</code>. Overriding this on its own is unusual; it mainly exists so <code>TESTOUT</code> has a sensible default.</p>
+</dd>
+<dt class="hdlist1">TESTOUT</dt>
+<dd>
+<p>Default: <code>$(TESTDIR)</code>.
+Directory <code>pg_regress</code> writes actual test output to&#8201;&#8212;&#8201;<code>$(TESTOUT)/results/</code>, <code>$(TESTOUT)/regression.diffs</code>, etc.&#8201;&#8212;&#8201;via <code>--outputdir</code> in <code>REGRESS_OPTS</code>. Kept separate from <code>TESTDIR</code> so generated output can be pointed somewhere other than the directory holding your checked-in <code>sql</code>/<code>expected</code> files, if you want that separation.</p>
+</dd>
+<dt class="hdlist1">PGXNTOOL_VERIFY_RESULTS_MODE</dt>
+<dd>
+<p>Default: <code>pgtap</code>.
+Controls how the <a href="#_verify_results_safeguard">verify-results safeguard</a> decides whether tests are failing. <code>pgtap</code> scans <code>test/results/*.out</code> for pgTap <code>not ok</code> lines and plan mismatches (falling back to checking for <code>regression.diffs</code> too); <code>diffs</code> checks only for <code>regression.diffs</code>, matching classic pg_regress behavior. Set to <code>diffs</code> if your test suite doesn&#8217;t use pgTap.</p>
+</dd>
+<dt class="hdlist1">PGXNTOOL_ENABLE_TEST_BUILD</dt>
+<dd>
+<p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/build/*.sql</code> files exist, <code>no</code> otherwise.
+Enables or disables the <a href="#_test_build">test-build</a> pre-flight SQL check. Set explicitly to <code>yes</code> if you want an error when <code>test/build/</code> unexpectedly has no SQL files (catches accidental deletion of its contents), or to <code>no</code> to disable the check even when files are present.</p>
+</dd>
+<dt class="hdlist1">PGXNTOOL_ENABLE_TEST_INSTALL</dt>
+<dd>
+<p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/install/*.sql</code> files exist, <code>no</code> otherwise.
+Enables or disables the <a href="#_testinstall">test/install</a> schedule-based setup feature. Same explicit-override semantics as <code>PGXNTOOL_ENABLE_TEST_BUILD</code>.</p>
+</dd>
+<dt class="hdlist1">PGXNTOOL_ENABLE_VERIFY_RESULTS</dt>
+<dd>
+<p>Default: <code>yes</code>.
+Enables or disables the <a href="#_verify_results_safeguard">verify-results safeguard</a> that blocks <code>make results</code> when tests are failing. Setting it to empty on the command line (<code>make PGXNTOOL_ENABLE_VERIFY_RESULTS= results</code>) also disables it.</p>
+</dd>
+<dt class="hdlist1">PGXNTOOL_NO_PGXS_INCLUDE</dt>
+<dd>
+<p>Default: unset (PGXS is included normally).
+Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced scenarios where you need to manage the PGXS include yourself; most projects should never set this.</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_copyright"><a class="anchor" href="#_copyright"></a><a class="link" href="#_copyright">9. Copyright</a></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Copyright (c) 2026 Jim Nasby &lt;<a href="mailto:Jim.Nasby@gmail.com">Jim.Nasby@gmail.com</a>&gt;</p>
 </div>
 <div class="paragraph">
 <p>PGXNtool is released under a <a href="https://github.com/decibel/pgxntool/blob/master/LICENCE">BSD license</a>. Note that it includes <a href="https://github.com/dominictarr/JSON.sh">JSON.sh</a>, which is released under a <a href="https://github.com/decibel/pgxntool/blob/master/JSON.sh.LICENCE">MIT license</a>.</p>
@@ -1509,11 +1585,9 @@ Copyright (c) 2026 Jim Nasby &lt;<a href="mailto:Jim.Nasby@gmail.com">Jim.Nasby@
 </div>
 </div>
 </div>
-</div>
-</div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-03-26 16:45:03 -0500
+Last updated 2026-07-26 14:07:03 -0500
 </div>
 </div>
 </body>

@@ -207,8 +207,7 @@ EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) pg_tle/
 # --outputdir above), so that's the directory that actually needs cleaning.
 # filter-out (not -=, which GNU Make 4.4+ rejects as a parse error) guards
 # against a stray top-level results/ entry while adding the real one.
-EXTRA_CLEAN := $(filter-out results/,$(EXTRA_CLEAN))
-EXTRA_CLEAN += $(TESTOUT)/results/
+EXTRA_CLEAN := $(filter-out results/,$(EXTRA_CLEAN)) $(TESTOUT)/results/
 
 # Get Postgres version, as well as major (9.4, etc) version.
 # NOTE! In at least some versions, PGXS defines VERSION, so we intentionally don't use that variable
@@ -285,6 +284,13 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # expected output lives alongside the .sql files (test/install/foo.out), not
 # in a separate expected/ subdirectory, so there's no 1:1 directory mirror to
 # compare.
+#
+# pg_regress supports up to 10 alternate expected-output files per test
+# (test.out, test_0.out .. test_9.out - see get_alternative_expectfile() in
+# pg_regress.c), tried in turn when the primary doesn't match. A naive
+# basename comparison flags test_1.out etc. as orphaned since there's no
+# test_1.sql. Before reporting a file as stale, also check whether stripping
+# a trailing _N (single digit) yields a base with a matching .sql.
 .PHONY: check-stale-expected
 check-stale-expected:
 	@failed=0; \
@@ -293,7 +299,14 @@ check-stale-expected:
 		for f in "$$expdir"/*.out; do \
 			[ -f "$$f" ] || continue; \
 			base=$$(basename "$$f" .out); \
-			if [ ! -f "$$sqldir/$$base.sql" ]; then \
+			ok=0; \
+			[ -f "$$sqldir/$$base.sql" ] && ok=1; \
+			if [ "$$ok" = 0 ]; then \
+				case "$$base" in \
+					*_[0-9]) altbase=$${base%_*}; [ -f "$$sqldir/$$altbase.sql" ] && ok=1 ;; \
+				esac; \
+			fi; \
+			if [ "$$ok" = 0 ]; then \
 				echo "ERROR: $$f has no corresponding $$sqldir/$$base.sql" >&2; \
 				failed=1; \
 			fi; \
