@@ -70,8 +70,14 @@ jobs:
               pull_number: prNumber,
               per_page: 100
             });
-            const isDocOnly = changedFiles.length > 0 && changedFiles.every(f =>
-              DOC_EXTENSIONS.test(f.filename) && !f.filename.startsWith('.github/')
+            // Check both filename and previous_filename: a rename like
+            // src/foo.sql -> docs/foo.md must not read as doc-only just
+            // because the new name matches — the old path is a real change.
+            const changedPaths = changedFiles.flatMap(f =>
+              f.previous_filename ? [f.filename, f.previous_filename] : [f.filename]
+            );
+            const isDocOnly = changedPaths.length > 0 && changedPaths.every(p =>
+              DOC_EXTENSIONS.test(p) && !p.startsWith('.github/')
             );
             if (isDocOnly) {
               core.info(
