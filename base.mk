@@ -1,3 +1,12 @@
+# Include guard: base.mk can end up included twice in a single `make` run
+# (e.g. an extension's own .mk module includes it, and the extension's
+# Makefile also includes it directly via the line setup.sh writes). Without
+# this, every target in the file gets redefined, producing
+# overriding-recipe/ignoring-old-recipe warnings. A second inclusion is a
+# harmless no-op.
+ifndef PGXNTOOL_BASE_MK_INCLUDED
+PGXNTOOL_BASE_MK_INCLUDED := 1
+
 PGXNTOOL_DIR := pgxntool
 
 # Ensure 'all' is the default target (not META.json which happens to be first)
@@ -193,6 +202,13 @@ MODULES =# Set to NUL so PGXS doesn't puke
 endif
 
 EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) pg_tle/
+# PGXS's own pg_regress_clean_files unconditionally rm -rf's a top-level
+# results/, but our tests write to $(TESTOUT)/results/ (see REGRESS_OPTS
+# --outputdir above), so that's the directory that actually needs cleaning.
+# filter-out (not -=, which GNU Make 4.4+ rejects as a parse error) guards
+# against a stray top-level results/ entry while adding the real one.
+EXTRA_CLEAN := $(filter-out results/,$(EXTRA_CLEAN))
+EXTRA_CLEAN += $(TESTOUT)/results/
 
 # Get Postgres version, as well as major (9.4, etc) version.
 # NOTE! In at least some versions, PGXS defines VERSION, so we intentionally don't use that variable
@@ -256,6 +272,35 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 #
 # These targets are meant to make running tests easier.
 
+# ------------------------------------------------------------------------------
+# check-stale-expected: catch orphaned test/expected/ files
+# ------------------------------------------------------------------------------
+# Purpose: test/expected/*.out must mirror test/sql/*.sql 1:1 (likewise
+# test/build/expected/*.out vs test/build/*.sql, when test-build is in use).
+# It's easy to leave a stale .out behind after renaming or removing a .sql
+# file; this makes `make test` fail loudly instead of letting it linger
+# unnoticed.
+#
+# test/install/ is NOT checked here: per the test/install comments above, its
+# expected output lives alongside the .sql files (test/install/foo.out), not
+# in a separate expected/ subdirectory, so there's no 1:1 directory mirror to
+# compare.
+.PHONY: check-stale-expected
+check-stale-expected:
+	@failed=0; \
+	for pair in "$(TESTDIR)/sql $(TESTDIR)/expected" "$(TESTDIR)/build $(TESTDIR)/build/expected"; do \
+		set -- $$pair; sqldir=$$1; expdir=$$2; \
+		for f in "$$expdir"/*.out; do \
+			[ -f "$$f" ] || continue; \
+			base=$$(basename "$$f" .out); \
+			if [ ! -f "$$sqldir/$$base.sql" ]; then \
+				echo "ERROR: $$f has no corresponding $$sqldir/$$base.sql" >&2; \
+				failed=1; \
+			fi; \
+		done; \
+	done; \
+	exit $$failed
+
 # make test: run any test dependencies, then do a `make install installcheck`.
 # If regressions are found, it will output them.
 #
@@ -264,7 +309,7 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # clean it's an indication of a missing dependency anyway.
 .PHONY: test
 # Build test dependencies list based on enabled features
-TEST_DEPS = testdeps
+TEST_DEPS = check-stale-expected testdeps
 ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_DEPS += test-build
 endif
@@ -439,10 +484,14 @@ docclean:
 #
 # TAGGING SUPPORT
 #
+# Remote used for tag/rmtag/forcetag/dist. Override on the command line or in
+# your Makefile if you push tags somewhere other than origin.
+PGXN_REMOTE ?= origin
+
 rmtag:
-	git fetch origin # Update our remotes
+	git fetch $(PGXN_REMOTE) # Update our remotes
 	@test -z "$$(git tag --list $(PGXNVERSION))" || git tag -d $(PGXNVERSION)
-	@test -z "$$(git ls-remote --tags origin $(PGXNVERSION) | grep -v '{}')" || git push --delete origin $(PGXNVERSION)
+	@test -z "$$(git ls-remote --tags $(PGXN_REMOTE) $(PGXNVERSION) | grep -v '{}')" || git push --delete $(PGXN_REMOTE) $(PGXNVERSION)
 
 tag:
 	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
@@ -457,7 +506,7 @@ tag:
 	else \
 		git tag $(PGXNVERSION); \
 	fi
-	git push origin $(PGXNVERSION)
+	git push $(PGXN_REMOTE) $(PGXNVERSION)
 
 .PHONY: forcetag
 forcetag: rmtag tag
@@ -560,3 +609,5 @@ $(DESTDIR)$(datadir)/extension/pgtap.control:
 	pgxn install pgtap --sudo
 
 endif # fndef PGXNTOOL_NO_PGXS_INCLUDE
+
+endif # ifndef PGXNTOOL_BASE_MK_INCLUDED
