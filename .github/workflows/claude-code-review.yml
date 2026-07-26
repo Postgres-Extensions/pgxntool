@@ -9,8 +9,14 @@ name: Claude Code Review
 # write-capable token. The job is gated to PRs from the trusted `jnasbyupgrade`
 # fork only — an arbitrary external fork can never trigger this secret-bearing
 # job. The workflow file always comes from the base branch (master), so a PR
-# cannot modify the reviewer that runs on it. We check out the PR head only for
-# read context (persist-credentials: false) and never build or execute PR code.
+# cannot modify the reviewer that runs on it. We never check out the fork's PR
+# head: GitHub Actions refuses that combination by default (the "pwn request"
+# guard — see actions/checkout's allow-unsafe-pr-checkout), and
+# anthropics/claude-code-action's own docs (docs/security.md) recommend
+# checking out the base ref and letting the action read PR content via the
+# GitHub API instead. The code-review prompt passes the PR number; the action
+# has a GitHub token and pull-requests read/write, so it fetches the diff
+# itself (e.g. `gh pr diff`) without ever writing fork code to disk.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -74,14 +80,16 @@ jobs:
           echo "decision=$decision" >> "$GITHUB_OUTPUT"
           echo "gate decision: $decision"
 
-      - name: Check out PR head (read-only context)
+      - name: Check out base branch
         if: steps.gate.outputs.decision == 'run'
         # Intentionally tracks the major-version tag (not a pinned SHA) so
         # upstream fixes are picked up automatically.
-        uses: actions/checkout@v4
+        #
+        # No `repository:`/`ref:` here on purpose — this checks out the base
+        # branch (master), never the fork's PR head. See the SECURITY note
+        # above.
+        uses: actions/checkout@v6
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
           persist-credentials: false
 
