@@ -101,7 +101,7 @@ include pgxntool/base.mk
   - `PGXNVERSION` - version number
   - `EXTENSIONS` - list of extensions provided
   - `EXTENSION_*_VERSION` - per-extension versions
-  - `EXTENSION_VERSION_FILES` - auto-generated versioned SQL files
+  - `EXTENSION__CURRENT_VERSION__FILES` - auto-generated versioned SQL files
 - `base.mk` includes `meta.mk` via `-include`
 
 ### The Magic of base.mk
