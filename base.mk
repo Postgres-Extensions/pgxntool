@@ -278,41 +278,17 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # test/build/expected/*.out vs test/build/*.sql, when test-build is in use).
 # It's easy to leave a stale .out behind after renaming or removing a .sql
 # file; this makes `make test` fail loudly instead of letting it linger
-# unnoticed.
+# unnoticed. Logic lives in check-stale-expected.sh (enough of it to warrant
+# a real script rather than an inline recipe).
 #
-# test/install/ is NOT checked here: per the test/install comments above, its
-# expected output lives alongside the .sql files (test/install/foo.out), not
-# in a separate expected/ subdirectory, so there's no 1:1 directory mirror to
-# compare.
-#
-# pg_regress supports up to 10 alternate expected-output files per test
-# (test.out, test_0.out .. test_9.out - see get_alternative_expectfile() in
-# pg_regress.c), tried in turn when the primary doesn't match. A naive
-# basename comparison flags test_1.out etc. as orphaned since there's no
-# test_1.sql. Before reporting a file as stale, also check whether stripping
-# a trailing _N (single digit) yields a base with a matching .sql.
+# This depends on `installcheck` directly (not just position in TEST_DEPS)
+# because it MUST run after pg_regress, not before: TEST_DEPS lists multiple
+# independent prerequisites of `test`, and Make does not guarantee the order
+# unrelated prerequisites of the same target are built in. An explicit
+# dependency edge is the only ordering guarantee Make actually gives.
 .PHONY: check-stale-expected
-check-stale-expected:
-	@failed=0; \
-	for pair in "$(TESTDIR)/sql $(TESTDIR)/expected" "$(TESTDIR)/build $(TESTDIR)/build/expected"; do \
-		set -- $$pair; sqldir=$$1; expdir=$$2; \
-		for f in "$$expdir"/*.out; do \
-			[ -f "$$f" ] || continue; \
-			base=$$(basename "$$f" .out); \
-			ok=0; \
-			[ -f "$$sqldir/$$base.sql" ] && ok=1; \
-			if [ "$$ok" = 0 ]; then \
-				case "$$base" in \
-					*_[0-9]) altbase=$${base%_*}; [ -f "$$sqldir/$$altbase.sql" ] && ok=1 ;; \
-				esac; \
-			fi; \
-			if [ "$$ok" = 0 ]; then \
-				echo "ERROR: $$f has no corresponding $$sqldir/$$base.sql" >&2; \
-				failed=1; \
-			fi; \
-		done; \
-	done; \
-	exit $$failed
+check-stale-expected: installcheck
+	@$(PGXNTOOL_DIR)/check-stale-expected.sh $(TESTDIR)
 
 # make test: run any test dependencies, then do a `make install installcheck`.
 # If regressions are found, it will output them.
@@ -322,11 +298,11 @@ check-stale-expected:
 # clean it's an indication of a missing dependency anyway.
 .PHONY: test
 # Build test dependencies list based on enabled features
-TEST_DEPS = check-stale-expected testdeps
+TEST_DEPS = testdeps
 ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_DEPS += test-build
 endif
-TEST_DEPS += install installcheck
+TEST_DEPS += install installcheck check-stale-expected
 test: $(TEST_DEPS)
 	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; fi
 

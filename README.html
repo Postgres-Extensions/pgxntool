@@ -491,7 +491,20 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_troubleshooting">7.7. Troubleshooting</a></li>
 </ul>
 </li>
-<li><a href="#_configuration_variables">8. Configuration Variables</a></li>
+<li><a href="#_configuration_variables">8. Configuration Variables</a>
+<ul class="sectlevel2">
+<li><a href="#_pgxn_remote">8.1. PGXN_REMOTE</a></li>
+<li><a href="#_asciidoc">8.2. ASCIIDOC</a></li>
+<li><a href="#_pg_config">8.3. PG_CONFIG</a></li>
+<li><a href="#_testdir">8.4. TESTDIR</a></li>
+<li><a href="#_testout">8.5. TESTOUT</a></li>
+<li><a href="#_pgxntool_verify_results_mode">8.6. PGXNTOOL_VERIFY_RESULTS_MODE</a></li>
+<li><a href="#_pgxntool_enable_test_build">8.7. PGXNTOOL_ENABLE_TEST_BUILD *</a></li>
+<li><a href="#_pgxntool_enable_test_install">8.8. PGXNTOOL_ENABLE_TEST_INSTALL *</a></li>
+<li><a href="#_pgxntool_enable_verify_results">8.9. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
+<li><a href="#_pgxntool_no_pgxs_include">8.10. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
+</ul>
+</li>
 <li><a href="#_copyright">9. Copyright</a></li>
 </ul>
 </div>
@@ -1512,64 +1525,82 @@ there are several untrusted languages (such as plpython), and the only tests for
 <div class="paragraph">
 <p>This is the comprehensive list of make variables you can override to customize pgxntool&#8217;s behavior, either in your Makefile (before <code>include pgxntool/base.mk</code>) or on the <code>make</code> command line. Several of these are also covered in more detail in the sections above; this section exists so there&#8217;s one place that lists all of them.</p>
 </div>
-<div class="dlist">
-<dl>
-<dt class="hdlist1">PGXN_REMOTE</dt>
-<dd>
-<p>Default: <code>origin</code>.
-The git remote used by <code>tag</code>, <code>rmtag</code>, <code>forcetag</code>, and <code>dist</code> (which depends on <code>tag</code>). If your <code>origin</code> is a personal fork rather than the canonical repository&#8201;&#8212;&#8201;for example, if you develop on a fork and only push release tags to the canonical repo&#8201;&#8212;&#8201;set this so tagging and pushing target the right remote:</p>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+Variables marked with <code>*</code> must be set to exactly <code>yes</code> or <code>no</code> (case-insensitive) when given explicitly; any other value is a hard <code>make</code> error.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_pgxn_remote"><a class="anchor" href="#_pgxn_remote"></a><a class="link" href="#_pgxn_remote">8.1. PGXN_REMOTE</a></h3>
+<div class="paragraph">
+<p>Default: <code>origin</code>. The git remote used by <code>tag</code>, <code>rmtag</code>, <code>forcetag</code>, and <code>dist</code> (which depends on <code>tag</code>). If your <code>origin</code> is a personal fork rather than the canonical repository&#8201;&#8212;&#8201;for example, if you develop on a fork and only push release tags to the canonical repo&#8201;&#8212;&#8201;set this so tagging and pushing target the right remote:</p>
+</div>
 <div class="listingblock">
 <div class="content">
 <pre>make dist PGXN_REMOTE=upstream</pre>
 </div>
 </div>
-</dd>
-<dt class="hdlist1">ASCIIDOC</dt>
-<dd>
-<p>Default: auto-detected, the first of <code>asciidoctor</code> or <code>asciidoc</code> found on <code>PATH</code>.
-Path to the Asciidoc processor used to build <code>.html</code> files from <code>$(ASCIIDOC_EXTS)</code> source files. Override if the processor you want isn&#8217;t first on <code>PATH</code>, or isn&#8217;t on <code>PATH</code> at all. See <a href="#_document_handling">Document Handling</a>.</p>
-</dd>
-<dt class="hdlist1">PG_CONFIG</dt>
-<dd>
-<p>Default: <code>pg_config</code>.
-Path to the <code>pg_config</code> binary used to detect the PostgreSQL version and locate PGXS. Override when the right <code>pg_config</code> isn&#8217;t the one on <code>PATH</code>, such as when testing against a specific PostgreSQL install.</p>
-</dd>
-<dt class="hdlist1">TESTDIR</dt>
-<dd>
-<p>Default: <code>test</code>.
-Root directory for test input files: <code>$(TESTDIR)/sql/</code>, <code>$(TESTDIR)/expected/</code>, <code>$(TESTDIR)/build/</code>, <code>$(TESTDIR)/install/</code>. Overriding this on its own is unusual; it mainly exists so <code>TESTOUT</code> has a sensible default.</p>
-</dd>
-<dt class="hdlist1">TESTOUT</dt>
-<dd>
-<p>Default: <code>$(TESTDIR)</code>.
-Directory <code>pg_regress</code> writes actual test output to&#8201;&#8212;&#8201;<code>$(TESTOUT)/results/</code>, <code>$(TESTOUT)/regression.diffs</code>, etc.&#8201;&#8212;&#8201;via <code>--outputdir</code> in <code>REGRESS_OPTS</code>. Kept separate from <code>TESTDIR</code> so generated output can be pointed somewhere other than the directory holding your checked-in <code>sql</code>/<code>expected</code> files, if you want that separation.</p>
-</dd>
-<dt class="hdlist1">PGXNTOOL_VERIFY_RESULTS_MODE</dt>
-<dd>
-<p>Default: <code>pgtap</code>.
-Controls how the <a href="#_verify_results_safeguard">verify-results safeguard</a> decides whether tests are failing. <code>pgtap</code> scans <code>test/results/*.out</code> for pgTap <code>not ok</code> lines and plan mismatches (falling back to checking for <code>regression.diffs</code> too); <code>diffs</code> checks only for <code>regression.diffs</code>, matching classic pg_regress behavior. Set to <code>diffs</code> if your test suite doesn&#8217;t use pgTap.</p>
-</dd>
-<dt class="hdlist1">PGXNTOOL_ENABLE_TEST_BUILD</dt>
-<dd>
-<p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/build/*.sql</code> files exist, <code>no</code> otherwise.
-Enables or disables the <a href="#_test_build">test-build</a> pre-flight SQL check. Set explicitly to <code>yes</code> if you want an error when <code>test/build/</code> unexpectedly has no SQL files (catches accidental deletion of its contents), or to <code>no</code> to disable the check even when files are present.</p>
-</dd>
-<dt class="hdlist1">PGXNTOOL_ENABLE_TEST_INSTALL</dt>
-<dd>
-<p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/install/*.sql</code> files exist, <code>no</code> otherwise.
-Enables or disables the <a href="#_testinstall">test/install</a> schedule-based setup feature. Same explicit-override semantics as <code>PGXNTOOL_ENABLE_TEST_BUILD</code>.</p>
-</dd>
-<dt class="hdlist1">PGXNTOOL_ENABLE_VERIFY_RESULTS</dt>
-<dd>
-<p>Default: <code>yes</code>.
-Enables or disables the <a href="#_verify_results_safeguard">verify-results safeguard</a> that blocks <code>make results</code> when tests are failing. Setting it to empty on the command line (<code>make PGXNTOOL_ENABLE_VERIFY_RESULTS= results</code>) also disables it.</p>
-</dd>
-<dt class="hdlist1">PGXNTOOL_NO_PGXS_INCLUDE</dt>
-<dd>
-<p>Default: unset (PGXS is included normally).
-Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced scenarios where you need to manage the PGXS include yourself; most projects should never set this.</p>
-</dd>
-</dl>
+</div>
+<div class="sect2">
+<h3 id="_asciidoc"><a class="anchor" href="#_asciidoc"></a><a class="link" href="#_asciidoc">8.2. ASCIIDOC</a></h3>
+<div class="paragraph">
+<p>Default: auto-detected, the first of <code>asciidoctor</code> or <code>asciidoc</code> found on <code>PATH</code>. Path to the Asciidoc processor used to build <code>.html</code> files from <code>$(ASCIIDOC_EXTS)</code> source files. Override if the processor you want isn&#8217;t first on <code>PATH</code>, or isn&#8217;t on <code>PATH</code> at all. See <a href="#_document_handling">Document Handling</a>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pg_config"><a class="anchor" href="#_pg_config"></a><a class="link" href="#_pg_config">8.3. PG_CONFIG</a></h3>
+<div class="paragraph">
+<p>Default: <code>pg_config</code>. Path to the <code>pg_config</code> binary used to detect the PostgreSQL version and locate PGXS. Override when the right <code>pg_config</code> isn&#8217;t the one on <code>PATH</code>, such as when testing against a specific PostgreSQL install.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_testdir"><a class="anchor" href="#_testdir"></a><a class="link" href="#_testdir">8.4. TESTDIR</a></h3>
+<div class="paragraph">
+<p>Default: <code>test</code>. Root directory for test input files: <code>$(TESTDIR)/sql/</code>, <code>$(TESTDIR)/expected/</code>, <code>$(TESTDIR)/build/</code>, <code>$(TESTDIR)/install/</code>. Overriding this on its own is unusual; it mainly exists so <code>TESTOUT</code> has a sensible default.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_testout"><a class="anchor" href="#_testout"></a><a class="link" href="#_testout">8.5. TESTOUT</a></h3>
+<div class="paragraph">
+<p>Default: <code>$(TESTDIR)</code>. Directory <code>pg_regress</code> writes actual test output to&#8201;&#8212;&#8201;<code>$(TESTOUT)/results/</code>, <code>$(TESTOUT)/regression.diffs</code>, etc.&#8201;&#8212;&#8201;via <code>--outputdir</code> in <code>REGRESS_OPTS</code>. Kept separate from <code>TESTDIR</code> so generated output can be pointed somewhere other than the directory holding your checked-in <code>sql</code>/<code>expected</code> files, if you want that separation.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_verify_results_mode"><a class="anchor" href="#_pgxntool_verify_results_mode"></a><a class="link" href="#_pgxntool_verify_results_mode">8.6. PGXNTOOL_VERIFY_RESULTS_MODE</a></h3>
+<div class="paragraph">
+<p>Default: <code>pgtap</code>. Controls how the <a href="#_verify_results_safeguard">verify-results safeguard</a> decides whether tests are failing. <code>pgtap</code> scans <code>test/results/*.out</code> for pgTap <code>not ok</code> lines and plan mismatches (falling back to checking for <code>regression.diffs</code> too); <code>diffs</code> checks only for <code>regression.diffs</code>, matching classic pg_regress behavior. Set to <code>diffs</code> if your test suite doesn&#8217;t use pgTap.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_enable_test_build"><a class="anchor" href="#_pgxntool_enable_test_build"></a><a class="link" href="#_pgxntool_enable_test_build">8.7. PGXNTOOL_ENABLE_TEST_BUILD *</a></h3>
+<div class="paragraph">
+<p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/build/*.sql</code> files exist, <code>no</code> otherwise. Enables or disables the <a href="#_test_build">test-build</a> pre-flight SQL check. Set explicitly to <code>yes</code> if you want an error when <code>test/build/</code> unexpectedly has no SQL files (catches accidental deletion of its contents), or to <code>no</code> to disable the check even when files are present.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_enable_test_install"><a class="anchor" href="#_pgxntool_enable_test_install"></a><a class="link" href="#_pgxntool_enable_test_install">8.8. PGXNTOOL_ENABLE_TEST_INSTALL *</a></h3>
+<div class="paragraph">
+<p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/install/*.sql</code> files exist, <code>no</code> otherwise. Enables or disables the <a href="#_testinstall">test/install</a> schedule-based setup feature. Same explicit-override semantics as <code>PGXNTOOL_ENABLE_TEST_BUILD</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.9. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
+<div class="paragraph">
+<p>Default: <code>yes</code>. Enables or disables the <a href="#_verify_results_safeguard">verify-results safeguard</a> that blocks <code>make results</code> when tests are failing. Setting it to empty on the command line (<code>make PGXNTOOL_ENABLE_VERIFY_RESULTS= results</code>) also disables it.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.10. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
+<div class="paragraph">
+<p>Default: unset (PGXS is included normally). Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced scenarios where you need to manage the PGXS include yourself; most projects should never set this.</p>
+</div>
 </div>
 </div>
 </div>
@@ -1587,7 +1618,7 @@ Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-26 14:07:03 -0500
+Last updated 2026-07-26 14:29:30 -0500
 </div>
 </div>
 </body>
