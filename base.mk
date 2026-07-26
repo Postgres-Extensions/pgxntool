@@ -328,11 +328,12 @@ PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
 # Depend on 'all' to ensure versioned SQL files are generated first
 # Depend on control.mk (which defines EXTENSION_VERSION_FILES)
 # Depend on control files explicitly so changes trigger rebuilds
-# Generates all supported pg_tle versions for each extension
+# Generates all supported pg_tle versions for each extension, unless
+# PGTLE_VERSION is set on the command line to limit output to one range
 .PHONY: pgtle
 pgtle: all control.mk $(PGXNTOOL_CONTROL_FILES)
 	@$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
-		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext);)
+		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext) $(if $(PGTLE_VERSION),--pgtle-version $(PGTLE_VERSION));)
 
 #
 # pg_tle installation support
