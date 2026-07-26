@@ -7,13 +7,12 @@ This file documents pg_tle version boundaries that affect pgxntool's pg_tle supp
 ### 1.0.0-1.4.0
 - **pg_tle versions:** 1.0.0 through 1.3.x
 - **PostgreSQL support:** 11-17
-- **API:** No schema parameter on `install_extension()`
 - **Features:** Basic extension management, custom data types, authentication hooks
 
 ### 1.4.0-1.5.0
 - **pg_tle versions:** 1.4.0 through 1.4.x
 - **PostgreSQL support:** 11-17
-- **API:** `install_extension()` still has no schema parameter. Added alignment/storage parameters to `pgtle.create_base_type()`
+- **API:** Added alignment/storage parameters to `pgtle.create_base_type()`
 - **Features:** Custom alignment/storage, enhanced warnings
 
 ### 1.5.0+
@@ -24,8 +23,7 @@ This file documents pg_tle version boundaries that affect pgxntool's pg_tle supp
 
 ## Key API Changes by Version
 
-**1.4.0:** No change to `install_extension()`
-- Added alignment/storage parameters to `pgtle.create_base_type()` (see Features above)
+**1.4.0:** Added alignment/storage parameters to `pgtle.create_base_type()` (see Features above)
 
 **1.5.0:** Changed `pgtle.install_extension()` signature
 - Added required `schema` parameter
