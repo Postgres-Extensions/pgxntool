@@ -211,6 +211,15 @@ PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
 #   - Passed through to check-stale-expected.sh; see that script for the
 #     distinct error message/exit code this sub-check uses
 #
+# Variable: PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT
+#   - Path to the script the check-stale-expected target invokes
+#   - Default: $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
+#   - Exists so a test can swap in a stub script (e.g. one that just records
+#     that it was called) without needing to fake out any other part of
+#     PGXNTOOL_DIR, which many unrelated targets also read. See
+#     pgxntool-test's CLAUDE.md, "Proving a Script Was/Wasn't Invoked"
+#     (under "Testing"), for the pattern this supports.
+#
 # Implementation: See check-stale-expected target definition (search for
 # "check-stale-expected:" in this file)
 #
@@ -225,6 +234,8 @@ ifdef PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
 else
   PGXNTOOL_CHECK_EXPECTED_FILE_TYPES = yes
 endif
+
+PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
 
 # Generate unique database name for tests to prevent conflicts across projects
 # Uses project name + first 5 chars of md5 hash of current directory
@@ -333,7 +344,7 @@ TEST_DEPS = testdeps
 ifeq ($(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),yes)
 .PHONY: check-stale-expected
 check-stale-expected: installcheck
-	@PGXNTOOL_CHECK_EXPECTED_FILE_TYPES=$(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES) $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh $(TESTDIR)
+	@$(PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT) $(TESTDIR) $(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
 TEST_DEPS += check-stale-expected
 endif
 

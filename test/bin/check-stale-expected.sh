@@ -29,23 +29,26 @@
 #   2 - one or more unexpected non-.out files in expected/
 #   3 - both
 #
-# Usage: check-stale-expected.sh <testdir>
-# Env:   PGXNTOOL_CHECK_EXPECTED_FILE_TYPES=yes|no (default yes) -- controls
-#        the non-*.out file check described above.
+# Usage: check-stale-expected.sh <testdir> [check-file-types]
+#        check-file-types: yes|no (default yes) -- controls the non-*.out
+#        file check described above. Taken as a positional argument (rather
+#        than an environment variable) so it's easy to vary directly in a
+#        test loop instead of having to set/unset an env var around each
+#        invocation.
 
 set -o errexit -o errtrace -o pipefail
 
 BASEDIR=$(dirname "$0")
 source "$BASEDIR/../../lib.sh"
 
-if [ $# -ne 1 ]; then
-  die 1 "Usage: check-stale-expected.sh <testdir>"
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  die 1 "Usage: check-stale-expected.sh <testdir> [check-file-types]"
 fi
 
 testdir="$1"
 failed=0
 
-check_file_types=$(printf '%s' "${PGXNTOOL_CHECK_EXPECTED_FILE_TYPES:-yes}" | tr '[:upper:]' '[:lower:]')
+check_file_types=$(printf '%s' "${2:-yes}" | tr '[:upper:]' '[:lower:]')
 
 # Usage: check_pair <sql_dir> <expected_dir>
 check_pair() {
