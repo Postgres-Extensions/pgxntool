@@ -7,7 +7,8 @@
 # of truth for "what version of pgxntool is this?". If this copy was synced
 # from an unreleased commit rather than a tagged release, the first line
 # will be "STABLE" instead of a version number -- that's printed as-is, since
-# it's an accurate answer too.
+# it's an accurate answer too. Anything else (a corrupt or hand-edited file)
+# is rejected rather than printed as if it were a real answer.
 #
 # Usage: pgxntool-version.sh [<history-file>]
 #
@@ -28,5 +29,9 @@ history_file="${1:-$PGXNTOOL_DIR/HISTORY.asc}"
 version=$(head -n1 "$history_file")
 
 [[ -n "$version" ]] || die 1 "$history_file is empty"
+
+# Matches the X.Y.Z format the release process validates and stamps.
+[[ "$version" == "STABLE" || "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
+    die 1 "$history_file: first line '$version' is neither STABLE nor a X.Y.Z version"
 
 echo "$version"
