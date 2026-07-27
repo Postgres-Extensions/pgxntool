@@ -82,8 +82,11 @@ for control_file in "$@"; do
   echo "EXTENSION_${ext}_VERSION_FILE	= sql/${ext}--\$(EXTENSION_${ext}_VERSION).sql"
   echo "EXTENSION__CURRENT_VERSION__FILES		+= \$(EXTENSION_${ext}_VERSION_FILE)"
   echo "\$(EXTENSION_${ext}_VERSION_FILE): sql/${ext}.sql ${control_file}"
-  echo "	@echo '/* DO NOT EDIT - AUTO-GENERATED FILE */' > \$(EXTENSION_${ext}_VERSION_FILE)"
-  echo "	@cat sql/${ext}.sql >> \$(EXTENSION_${ext}_VERSION_FILE)"
+  # Single redirect via a subshell, not `>` truncate followed by `>>` append:
+  # if this rule ever runs twice in the same `make` invocation (e.g. reached
+  # through two different dependency chains under parallel make), the `>>`
+  # form doubles the file's content instead of overwriting it.
+  echo "	@(echo '/* DO NOT EDIT - AUTO-GENERATED FILE */'; cat sql/${ext}.sql) > \$(EXTENSION_${ext}_VERSION_FILE)"
   echo
 done
 
