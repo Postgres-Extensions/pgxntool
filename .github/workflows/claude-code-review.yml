@@ -38,6 +38,11 @@ jobs:
       contents: read
       pull-requests: write   # post the review comments
       checks: read           # read sibling check-runs for the cost gate
+      # write (not just read) needed so claude-code-action's internal
+      # bun-setup step can save its cache; read-only causes a harmless but
+      # noisy "Cache reservation failed: cache write denied: token has no
+      # writable scopes" warning.
+      actions: write
     steps:
       # COST GATE: the paid Claude review is the last thing to run. Wait for the
       # PR head's OTHER check-runs to finish and only proceed if they are clean.

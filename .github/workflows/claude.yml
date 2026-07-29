@@ -26,7 +26,12 @@ jobs:
       pull-requests: read
       issues: read
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      # Required for Claude to read CI results on PRs. write (not just read)
+      # is also needed so claude-code-action's internal bun-setup step can
+      # save its cache; read-only causes a harmless but noisy
+      # "Cache reservation failed: cache write denied: token has no writable
+      # scopes" warning.
+      actions: write
     steps:
       - name: Checkout repository
         # Intentionally tracks the major-version tag (not a pinned SHA) so
