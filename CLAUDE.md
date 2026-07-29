@@ -144,11 +144,11 @@ make                    # Build extension (generates versioned SQL, docs)
 make test              # Full test: testdeps → install → installcheck → show diffs
 make results           # Run tests and update expected output files
 make html              # Generate HTML from Asciidoc sources
-make tag               # Create git branch for current META.json version
+make tag               # Create git tag for current META.json version
 make dist              # Create PGXN .zip (auto-tags, places in ../)
 make pgtle             # Generate pg_tle registration SQL (see pg_tle Support below)
 make check-pgtle       # Check pg_tle installation and report version
-make install-pgtle    # Install pg_tle registration SQL files into database
+make run-pgtle         # Register extensions with pg_tle in the database
 make pgxntool-sync     # Update to latest pgxntool via git subtree pull
 ```
 
@@ -204,7 +204,7 @@ When tests fail, examine the diff output carefully. The actual test output in `t
 
 ### Distribution Packaging
 - `make dist` creates `../PGXN-VERSION.zip`
-- Always creates git branch tag matching version
+- Always creates git tag matching version
 - Uses `git archive` to package
 - Validates repo is clean before tagging
 
@@ -227,16 +227,16 @@ pgxntool can generate pg_tle (Trusted Language Extensions) registration SQL for 
 
 **Installation targets:**
 
-- `make check-pgtle` - Checks if pg_tle is installed and reports the version. Reports version from `pg_extension` if extension has been created, or newest available version from `pg_available_extension_versions` if available but not created. Errors if pg_tle not available in cluster. Assumes `PG*` environment variables are configured.
+- `make check-pgtle` - Checks if pg_tle is installed and reports the version. Reports the version from `pg_extension` if `CREATE EXTENSION pg_tle` has been run in the database. Errors if pg_tle is not available in the cluster. Assumes `PG*` environment variables are configured.
 
-- `make install-pgtle` - Auto-detects pg_tle version and installs appropriate registration SQL files. Updates or creates pg_tle extension as needed. Determines which version range files to install based on detected version. Runs all generated SQL files via `psql` to register extensions with pg_tle. Assumes `PG*` environment variables are configured.
+- `make run-pgtle` - Registers all extensions with pg_tle by executing the generated pg_tle registration SQL files. Requires pg_tle to already be installed in the target database (`CREATE EXTENSION pg_tle;`) -- it does not create the extension itself, and errors out telling you to run `make check-pgtle` if it's missing. Depends on `pgtle`, so it generates the SQL files first if needed. Assumes `PG*` environment variables are configured.
 
 **Version notation:**
 - `X.Y.Z+` means >= X.Y.Z
 - `X.Y.Z-A.B.C` means >= X.Y.Z and < A.B.C (note boundary)
 
 **Key implementation details:**
-- Script: `pgxntool/pgtle-wrap.sh` (bash)
+- Script: `pgxntool/pgtle.sh` (bash)
 - Parses `.control` files for metadata (NOT META.json)
 - Fixed delimiter: `$_pgtle_wrap_delimiter_$` (validated not in source)
 - Each output file contains ALL versions and ALL upgrade paths

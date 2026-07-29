@@ -499,16 +499,17 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <ul class="sectlevel2">
 <li><a href="#_pgxn_remote">8.1. PGXN_REMOTE</a></li>
 <li><a href="#_asciidoc">8.2. ASCIIDOC</a></li>
-<li><a href="#_pg_config">8.3. PG_CONFIG</a></li>
-<li><a href="#_testdir">8.4. TESTDIR</a></li>
-<li><a href="#_testout">8.5. TESTOUT</a></li>
-<li><a href="#_pgxntool_verify_results_mode">8.6. PGXNTOOL_VERIFY_RESULTS_MODE</a></li>
-<li><a href="#_pgxntool_enable_test_build">8.7. PGXNTOOL_ENABLE_TEST_BUILD *</a></li>
-<li><a href="#_pgxntool_enable_test_install">8.8. PGXNTOOL_ENABLE_TEST_INSTALL *</a></li>
-<li><a href="#_pgxntool_enable_verify_results">8.9. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
-<li><a href="#_pgxntool_enable_check_stale_expected">8.10. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></li>
-<li><a href="#_pgxntool_check_expected_file_types">8.11. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></li>
-<li><a href="#_pgxntool_no_pgxs_include">8.12. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
+<li><a href="#_pgtle_version">8.3. PGTLE_VERSION</a></li>
+<li><a href="#_pg_config">8.4. PG_CONFIG</a></li>
+<li><a href="#_testdir">8.5. TESTDIR</a></li>
+<li><a href="#_testout">8.6. TESTOUT</a></li>
+<li><a href="#_pgxntool_verify_results_mode">8.7. PGXNTOOL_VERIFY_RESULTS_MODE</a></li>
+<li><a href="#_pgxntool_enable_test_build">8.8. PGXNTOOL_ENABLE_TEST_BUILD *</a></li>
+<li><a href="#_pgxntool_enable_test_install">8.9. PGXNTOOL_ENABLE_TEST_INSTALL *</a></li>
+<li><a href="#_pgxntool_enable_verify_results">8.10. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
+<li><a href="#_pgxntool_enable_check_stale_expected">8.11. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></li>
+<li><a href="#_pgxntool_check_expected_file_types">8.12. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></li>
+<li><a href="#_pgxntool_no_pgxs_include">8.13. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
 </ul>
 </li>
 <li><a href="#_copyright">9. Copyright</a></li>
@@ -525,7 +526,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p>Currently, it consists a base Makefile that you can include instead of writing your own, a template <code>META.in.json</code> (from which <code>META.json</code> is generated — you edit the former, never the latter directly), and some test framework. More features will be added over time.</p>
 </div>
 <div class="paragraph">
-<p>If you find any bugs or have ideas for improvements, please <a href="https://github.com/decibel/pgxntool/issues"><strong>open an issue</strong></a>.</p>
+<p>If you find any bugs or have ideas for improvements, please <a href="https://github.com/Postgres-Extensions/pgxntool/issues"><strong>open an issue</strong></a>.</p>
 </div>
 </div>
 </div>
@@ -549,7 +550,7 @@ The <code>--squash</code> is important! Otherwise you&#8217;ll clutter your repo
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>git subtree add -P pgxntool --squash git@github.com:decibel/pgxntool.git release
+<pre>git subtree add -P pgxntool --squash git@github.com:Postgres-Extensions/pgxntool.git release
 pgxntool/setup.sh</pre>
 </div>
 </div>
@@ -918,7 +919,7 @@ check_control:
 </div>
 </div>
 <div class="paragraph">
-<p>If you want to over-ride the default dependency on <code>pgtap</code> you should be able to do that with a makefile override. If you need help with that, please <a href="https://github.com/decibel/pgxntool/issues">open an issue</a>.</p>
+<p>If you want to over-ride the default dependency on <code>pgtap</code> you should be able to do that with a makefile override. If you need help with that, please <a href="https://github.com/Postgres-Extensions/pgxntool/issues">open an issue</a>.</p>
 </div>
 <div class="admonitionblock warning">
 <table>
@@ -1027,7 +1028,7 @@ make PGXNTOOL_ENABLE_VERIFY_RESULTS=no results</pre>
 <div class="title">Warning</div>
 </td>
 <td class="content">
-You will be very unhappy if you forget to update the .control file for your extension! There is an <a href="https://github.com/decibel/pgxntool/issues/1">open issue</a> to improve this.
+You will be very unhappy if you forget to update the .control file for your extension! There is an <a href="https://github.com/Postgres-Extensions/pgxntool/issues/1">open issue</a> to improve this.
 </td>
 </tr>
 </table>
@@ -1114,6 +1115,18 @@ The actual work is done by <code>pgxntool/pgxntool-sync.sh</code>, so you can ru
 <div class="title">Tip</div>
 </td>
 <td class="content">
+<code>pgxntool-sync.sh</code> itself delegates the 3-way merge of <code>setup.sh</code>-copied files to <code>pgxntool/update-setup-files.sh &lt;old-pgxntool-commit&gt;</code>, which you can also run directly&#8201;&#8212;&#8201;for example, to redo or debug just the merge step without pulling again. <code>&lt;old-pgxntool-commit&gt;</code> is the pgxntool subtree commit that was current <strong>before</strong> the sync you want to re-merge.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Tip</div>
+</td>
+<td class="content">
 There is also a <code>pgxntool-sync-%</code> rule if you need to do more advanced things. <code>make pgxntool-sync-&lt;name&gt;</code> pulls from the <code>&lt;repo&gt; &lt;ref&gt;</code> defined by the <code>pgxntool-sync-&lt;name&gt;</code> make variable.
 </td>
 </tr>
@@ -1183,6 +1196,14 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 <div class="paragraph">
 <p><code>make pgtle</code> generates SQL files in <code>pg_tle/</code> subdirectories organized by pg_tle version ranges. For version range details, see <code>pgtle_versions.md</code>.</p>
+</div>
+<div class="paragraph">
+<p>Set <code>PGTLE_VERSION</code> on the command line to limit generation to the single version range that value falls into, instead of every known range:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make pgtle PGTLE_VERSION=1.5.0</pre>
+</div>
 </div>
 </div>
 <div class="sect2">
@@ -1363,8 +1384,7 @@ These files are auto-generated and include a header comment warning not to edit 
 <div class="listingblock">
 <div class="content">
 <pre>$(EXTENSION_ext_VERSION_FILE): sql/ext.sql extension.control
-	@echo '/* DO NOT EDIT - AUTO-GENERATED FILE */' &gt; $(EXTENSION_ext_VERSION_FILE)
-	@cat sql/ext.sql &gt;&gt; $(EXTENSION_ext_VERSION_FILE)</pre>
+	@(echo '/* DO NOT EDIT - AUTO-GENERATED FILE */'; cat sql/ext.sql) &gt; $(EXTENSION_ext_VERSION_FILE)</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1838,61 +1858,67 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pg_config"><a class="anchor" href="#_pg_config"></a><a class="link" href="#_pg_config">8.3. PG_CONFIG</a></h3>
+<h3 id="_pgtle_version"><a class="anchor" href="#_pgtle_version"></a><a class="link" href="#_pgtle_version">8.3. PGTLE_VERSION</a></h3>
+<div class="paragraph">
+<p>Default: unset (generates every known pg_tle version range). Set on the command line to limit <code>make pgtle</code> to the single version range this value falls into. See <a href="#_pgtle">pgtle</a>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pg_config"><a class="anchor" href="#_pg_config"></a><a class="link" href="#_pg_config">8.4. PG_CONFIG</a></h3>
 <div class="paragraph">
 <p>Default: <code>pg_config</code>. Path to the <code>pg_config</code> binary used to detect the PostgreSQL version and locate PGXS. Override when the right <code>pg_config</code> isn&#8217;t the one on <code>PATH</code>, such as when testing against a specific PostgreSQL install.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_testdir"><a class="anchor" href="#_testdir"></a><a class="link" href="#_testdir">8.4. TESTDIR</a></h3>
+<h3 id="_testdir"><a class="anchor" href="#_testdir"></a><a class="link" href="#_testdir">8.5. TESTDIR</a></h3>
 <div class="paragraph">
 <p>Default: <code>test</code>. Root directory for test input files: <code>$(TESTDIR)/sql/</code>, <code>$(TESTDIR)/expected/</code>, <code>$(TESTDIR)/build/</code>, <code>$(TESTDIR)/install/</code>. Overriding this on its own is unusual; it mainly exists so <code>TESTOUT</code> has a sensible default.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_testout"><a class="anchor" href="#_testout"></a><a class="link" href="#_testout">8.5. TESTOUT</a></h3>
+<h3 id="_testout"><a class="anchor" href="#_testout"></a><a class="link" href="#_testout">8.6. TESTOUT</a></h3>
 <div class="paragraph">
 <p>Default: <code>$(TESTDIR)</code>. Directory <code>pg_regress</code> writes actual test output to&#8201;&#8212;&#8201;<code>$(TESTOUT)/results/</code>, <code>$(TESTOUT)/regression.diffs</code>, etc.&#8201;&#8212;&#8201;via <code>--outputdir</code> in <code>REGRESS_OPTS</code>. Kept separate from <code>TESTDIR</code> so generated output can be pointed somewhere other than the directory holding your checked-in <code>sql</code>/<code>expected</code> files, if you want that separation.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_verify_results_mode"><a class="anchor" href="#_pgxntool_verify_results_mode"></a><a class="link" href="#_pgxntool_verify_results_mode">8.6. PGXNTOOL_VERIFY_RESULTS_MODE</a></h3>
+<h3 id="_pgxntool_verify_results_mode"><a class="anchor" href="#_pgxntool_verify_results_mode"></a><a class="link" href="#_pgxntool_verify_results_mode">8.7. PGXNTOOL_VERIFY_RESULTS_MODE</a></h3>
 <div class="paragraph">
 <p>Default: <code>pgtap</code>. Controls how the <a href="#_verify_results_safeguard">verify-results safeguard</a> decides whether tests are failing.</p>
 </div>
 <div class="sect3">
-<h4 id="_pgtap"><a class="anchor" href="#_pgtap"></a><a class="link" href="#_pgtap">8.6.1. pgtap</a></h4>
+<h4 id="_pgtap"><a class="anchor" href="#_pgtap"></a><a class="link" href="#_pgtap">8.7.1. pgtap</a></h4>
 <div class="paragraph">
 <p>Scans <code>test/results/*.out</code> for pgTap <code>not ok</code> lines and plan mismatches, falling back to checking for <code>regression.diffs</code> too. Use this mode when your test suite uses pgTap.</p>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_diffs"><a class="anchor" href="#_diffs"></a><a class="link" href="#_diffs">8.6.2. diffs</a></h4>
+<h4 id="_diffs"><a class="anchor" href="#_diffs"></a><a class="link" href="#_diffs">8.7.2. diffs</a></h4>
 <div class="paragraph">
 <p>Checks only for <code>regression.diffs</code>, matching classic pg_regress behavior. Use this mode when your tests use plain SQL expected-output comparison only.</p>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_test_build"><a class="anchor" href="#_pgxntool_enable_test_build"></a><a class="link" href="#_pgxntool_enable_test_build">8.7. PGXNTOOL_ENABLE_TEST_BUILD *</a></h3>
+<h3 id="_pgxntool_enable_test_build"><a class="anchor" href="#_pgxntool_enable_test_build"></a><a class="link" href="#_pgxntool_enable_test_build">8.8. PGXNTOOL_ENABLE_TEST_BUILD *</a></h3>
 <div class="paragraph">
 <p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/build/*.sql</code> files exist, <code>no</code> otherwise. Enables or disables the <a href="#_test_build">test-build</a> pre-flight SQL check. Set explicitly to <code>yes</code> if you want an error when <code>test/build/</code> unexpectedly has no SQL files (catches accidental deletion of its contents), or to <code>no</code> to disable the check even when files are present.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_test_install"><a class="anchor" href="#_pgxntool_enable_test_install"></a><a class="link" href="#_pgxntool_enable_test_install">8.8. PGXNTOOL_ENABLE_TEST_INSTALL *</a></h3>
+<h3 id="_pgxntool_enable_test_install"><a class="anchor" href="#_pgxntool_enable_test_install"></a><a class="link" href="#_pgxntool_enable_test_install">8.9. PGXNTOOL_ENABLE_TEST_INSTALL *</a></h3>
 <div class="paragraph">
 <p>Default: auto-detected&#8201;&#8212;&#8201;<code>yes</code> if <code>test/install/*.sql</code> files exist, <code>no</code> otherwise. Enables or disables the <a href="#_testinstall">test/install</a> schedule-based setup feature. Same explicit-override semantics as <code>PGXNTOOL_ENABLE_TEST_BUILD</code>.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.9. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
+<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.10. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Enables or disables the <a href="#_verify_results_safeguard">verify-results safeguard</a> that blocks <code>make results</code> when tests are failing. Setting it to empty on the command line (<code>make PGXNTOOL_ENABLE_VERIFY_RESULTS= results</code>) also disables it.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.10. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
+<h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.11. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Enables or disables the check-stale-expected safeguard, which fails <code>make test</code> if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains a <code>.out</code> file with no corresponding <code>.sql</code> file&#8201;&#8212;&#8201;catching a stale file left behind after a test was renamed or removed. Set to <code>no</code> to make the check a complete no-op (it&#8217;s dropped from <code>TEST_DEPS</code> entirely).</p>
 </div>
@@ -1901,13 +1927,13 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.11. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
+<h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.12. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Sub-check of check-stale-expected, independent of <code>PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED</code>: fails (with a distinct error message and exit code from the orphaned-<code>.out</code> check) if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains any file that isn&#8217;t <code>*.out</code>. Set to <code>no</code> to disable just this sub-check while leaving the orphaned-<code>.out</code> check active.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.12. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
+<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.13. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
 <div class="paragraph">
 <p>Default: unset (PGXS is included normally). Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced scenarios where you need to manage the PGXS include yourself; most projects should never set this.</p>
 </div>
@@ -1921,14 +1947,14 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <p>Copyright (c) 2026 Jim Nasby &lt;<a href="mailto:Jim.Nasby@gmail.com">Jim.Nasby@gmail.com</a>&gt;</p>
 </div>
 <div class="paragraph">
-<p>PGXNtool is released under a <a href="https://github.com/decibel/pgxntool/blob/master/LICENCE">BSD license</a>. Note that it includes <a href="https://github.com/dominictarr/JSON.sh">JSON.sh</a>, which is released under a <a href="https://github.com/decibel/pgxntool/blob/master/JSON.sh.LICENCE">MIT license</a>.</p>
+<p>PGXNtool is released under a <a href="https://github.com/Postgres-Extensions/pgxntool/blob/master/LICENSE">BSD license</a>. Note that it includes <a href="https://github.com/dominictarr/JSON.sh">JSON.sh</a>, which is released under a <a href="https://github.com/Postgres-Extensions/pgxntool/blob/master/JSON.sh.LICENSE">MIT license</a>.</p>
 </div>
 </div>
 </div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-29 13:41:25 -0500
+Last updated 2026-07-29 14:55:58 -0500
 </div>
 </div>
 </body>
