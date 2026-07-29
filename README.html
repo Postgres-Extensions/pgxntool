@@ -458,10 +458,12 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_dist">4.8. dist</a></li>
 <li><a href="#_pgxntool_sync">4.9. pgxntool-sync</a></li>
 <li><a href="#_pgxntool_version">4.10. pgxntool-version</a></li>
-<li><a href="#_distclean">4.11. distclean</a></li>
-<li><a href="#_pgtle">4.12. pgtle</a></li>
-<li><a href="#_check_pgtle">4.13. check-pgtle</a></li>
-<li><a href="#_run_pgtle">4.14. run-pgtle</a></li>
+<li><a href="#_list">4.11. list</a></li>
+<li><a href="#_print">4.12. print-%</a></li>
+<li><a href="#_distclean">4.13. distclean</a></li>
+<li><a href="#_pgtle">4.14. pgtle</a></li>
+<li><a href="#_check_pgtle">4.15. check-pgtle</a></li>
+<li><a href="#_run_pgtle">4.16. run-pgtle</a></li>
 </ul>
 </li>
 <li><a href="#_version_specific_sql_files">5. Version-Specific SQL Files</a>
@@ -593,7 +595,7 @@ pgxntool/setup.sh</pre>
 <div class="title">Note</div>
 </td>
 <td class="content">
-all the targets normally provided by Postgres <a href="http://www.postgresql.org/docs/current/static/extend-pgxs.html">PGXS</a> still work.
+all the targets normally provided by Postgres <a href="http://www.postgresql.org/docs/current/static/extend-pgxs.html">PGXS</a> still work. If you need to skip PGXS being included entirely (for advanced/non-standard setups), set <code>PGXNTOOL_NO_PGXS_INCLUDE</code> in your Makefile before <code>include pgxntool/base.mk</code>.
 </td>
 </tr>
 </table>
@@ -607,7 +609,10 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <div class="sect2">
 <h3 id="_test"><a class="anchor" href="#_test"></a><a class="link" href="#_test">4.2. test</a></h3>
 <div class="paragraph">
-<p>Runs unit tests via the PGXS <code>installcheck</code> target. Unlike a simple <code>make installcheck</code> though, the <code>test</code> rule has the following prerequisites: clean testdeps install installcheck. All of those are PGXS rules, except for <code>testdeps</code>.</p>
+<p>Runs your extension&#8217;s test suite: installs the extension and runs it through PGXS&#8217;s <code>installcheck</code>, first pulling in anything you&#8217;ve hooked into <a href="#_testdeps">testdeps</a> and, if enabled, sanity-checking your test SQL via <a href="#_test_build">test-build</a>.</p>
+</div>
+<div class="paragraph">
+<p>Whether <code>test-build</code> runs is controlled by the <code>PGXNTOOL_ENABLE_TEST_BUILD</code> variable — see <a href="#_test_build">test-build</a> for what it does and how to turn it on/off.</p>
 </div>
 <div class="admonitionblock note">
 <table>
@@ -616,7 +621,19 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <div class="title">Note</div>
 </td>
 <td class="content">
-While you can still run <code>make installcheck</code> or any other valid PGXS make target directly, it&#8217;s recommended to use <code>make test</code> when using pgxntool. The <code>test</code> target ensures clean builds, proper test isolation, and correct dependency installation.
+<code>test</code> intentionally does <strong>not</strong> depend on <code>clean</code> — that caused problems with incremental/watch-based builds. If your tests need a clean build to pass, that&#8217;s a sign of a missing dependency elsewhere rather than something to fix by adding <code>clean</code> back.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+While you can still run <code>make installcheck</code> or any other valid PGXS make target directly, it&#8217;s recommended to use <code>make test</code> when using pgxntool. The <code>test</code> target ensures proper test isolation and correct dependency installation.
 </td>
 </tr>
 </table>
@@ -955,19 +972,34 @@ It will probably cause problems if you try to create a <code>testdeps</code> rul
 <div class="sect3">
 <h4 id="_verify_results_safeguard"><a class="anchor" href="#_verify_results_safeguard"></a><a class="link" href="#_verify_results_safeguard">4.6.1. verify-results safeguard</a></h4>
 <div class="paragraph">
-<p>By default, <code>make results</code> will refuse to run if <code>test/results/regression.diffs</code> exists (indicating failing tests). This prevents accidentally updating expected files with incorrect output.</p>
+<p>By default, <code>make results</code> will refuse to run if your tests are failing, so you can&#8217;t accidentally promote incorrect output into the new expected results. Which failures it looks for is controlled by <code>PGXNTOOL_VERIFY_RESULTS_MODE</code>:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1"><code>pgtap</code> (the default)</dt>
+<dd>
+<p>Scans <code>test/results/*.out</code> for pgTAP <code>not ok</code> lines (ignoring <code># TODO</code> items) and plan-count mismatches, then also checks <code>test/results/regression.diffs</code> for any output mismatch pgTAP itself wouldn&#8217;t catch.</p>
+</dd>
+<dt class="hdlist1"><code>diffs</code></dt>
+<dd>
+<p>Only checks whether <code>test/results/regression.diffs</code> exists.</p>
+</dd>
+</dl>
 </div>
 <div class="paragraph">
-<p>If tests are failing, you&#8217;ll see:</p>
+<p>If tests are failing, <code>make results</code> prints an explanation of what failed and exits without touching <code>test/expected/</code>; fix the failures, then re-run <code>make results</code>.</p>
+</div>
+<div class="paragraph">
+<p>To select a mode explicitly:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>ERROR: Tests are failing. Cannot run 'make results'.
-Fix test failures first, then run 'make results'.</pre>
+<pre># In your Makefile
+PGXNTOOL_VERIFY_RESULTS_MODE = diffs  # or pgtap (the default)</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>To disable this safeguard (not recommended):</p>
+<p>To disable this safeguard entirely (not recommended):</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -983,10 +1015,10 @@ make PGXNTOOL_ENABLE_VERIFY_RESULTS=no results</pre>
 <div class="sect2">
 <h3 id="_tag"><a class="anchor" href="#_tag"></a><a class="link" href="#_tag">4.7. tag</a></h3>
 <div class="paragraph">
-<p><code>make tag</code> will create an annotated git tag for the current version of your extension, as determined by the META.json file (generated from <code>META.in.json</code> — see <a href="#_pgxn_distributions_vs_extensions">PGXN Distributions vs. Extensions</a>), and push it to <code>origin</code>. The reason to do this is so you can always refer to the exact code that went into a released version.</p>
+<p><code>make tag</code> will create a git tag for the current version of your extension, as determined by the META.json file (generated from <code>META.in.json</code> — see <a href="#_pgxn_distributions_vs_extensions">PGXN Distributions vs. Extensions</a>), and push it to <code>origin</code>. The reason to do this is so you can always refer to the exact code that went into a released version.</p>
 </div>
 <div class="paragraph">
-<p>If there&#8217;s already a tag for the current version that probably means you forgot to update META.json, so you&#8217;ll get an error. If you&#8217;re certain you want to over-write the tag, you can do <code>make forcetag</code>, which removes the existing tag (via <code>make rmtag</code>) and creates a new one.</p>
+<p>If a tag for the current version already exists and points at your current commit, <code>make tag</code> does nothing — this makes it safe for other targets (like <code>dist</code>) to depend on <code>tag</code> without worrying about re-running it. If the existing tag points at a <strong>different</strong> commit — meaning you likely forgot to bump the version — you&#8217;ll get an error. If you&#8217;re certain you want to over-write the tag, you can do <code>make forcetag</code>, which removes the existing tag (via <code>make rmtag</code>) and creates a new one.</p>
 </div>
 <div class="admonitionblock warning">
 <table>
@@ -1018,6 +1050,21 @@ Part of the <code>clean</code> recipe is cleaning up these .zip files. If you ac
 </tr>
 </table>
 </div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Warning</div>
+</td>
+<td class="content">
+If your project has a <code>.gitattributes</code> file, <code>make dist</code>/<code>make dist-only</code> will refuse to run unless it&#8217;s committed to git, and will tell you so. This is because <code>git archive</code> (which builds the .zip) only honors <code>export-ignore</code> attributes on <strong>committed</strong> files — an uncommitted <code>.gitattributes</code> would silently have no effect on the archive contents, which could leak files into your PGXN distribution that you meant to exclude.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p><code>make forcedist</code> is a shortcut for <code>forcetag dist</code>: it force-recreates the tag (see <code>forcetag</code> above) before rebuilding the distribution .zip.</p>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_pgxntool_sync"><a class="anchor" href="#_pgxntool_sync"></a><a class="link" href="#_pgxntool_sync">4.9. pgxntool-sync</a></h3>
@@ -1032,6 +1079,18 @@ Part of the <code>clean</code> recipe is cleaning up these .zip files. If you ac
 </td>
 <td class="content">
 Your repository must be clean (no modified files) in order to run this. Running this command will produce a git commit of the merge.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<code>git subtree pull</code> copies pgxntool&#8217;s entire tree into your project, including dev-only directories (<code>pgxntool/.github</code>, <code>pgxntool/.claude</code>) that don&#8217;t belong in a project that merely embeds pgxntool. Every sync automatically removes these two directories from <code>pgxntool/</code> afterward — this is expected, not a bug, and doesn&#8217;t affect anything else in your project.
 </td>
 </tr>
 </table>
@@ -1080,7 +1139,19 @@ The actual work is done by <code>pgxntool/bin/version</code>, so you can run it 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_distclean"><a class="anchor" href="#_distclean"></a><a class="link" href="#_distclean">4.11. distclean</a></h3>
+<h3 id="_list"><a class="anchor" href="#_list"></a><a class="link" href="#_list">4.11. list</a></h3>
+<div class="paragraph">
+<p><code>make list</code> prints every make target defined in your project — including ones provided by PGXS and pgxntool, not just ones you wrote — one per line. Useful for discovering what&#8217;s available without reading through the Makefile.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_print"><a class="anchor" href="#_print"></a><a class="link" href="#_print">4.12. print-%</a></h3>
+<div class="paragraph">
+<p><code>make print-VARNAME</code> prints the current value (and origin) of any make variable, e.g. <code>make print-PGXNVERSION</code>. Useful for debugging why a variable isn&#8217;t set to what you expect.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_distclean"><a class="anchor" href="#_distclean"></a><a class="link" href="#_distclean">4.13. distclean</a></h3>
 <div class="paragraph">
 <p><code>make distclean</code> removes generated configuration files (<code>META.json</code> — generated from <code>META.in.json</code> — plus <code>meta.mk</code> and <code>control.mk</code>) that survive a normal <code>make clean</code>.</p>
 </div>
@@ -1106,7 +1177,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.12. pgtle</a></h3>
+<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.14. pgtle</a></h3>
 <div class="paragraph">
 <p>Generates pg_tle (Trusted Language Extensions) registration SQL files for deploying extensions in managed environments like AWS RDS/Aurora. See <a href="#_pg_tle_Support">[_pg_tle_Support]</a> for complete documentation.</p>
 </div>
@@ -1115,7 +1186,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.13. check-pgtle</a></h3>
+<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.15. check-pgtle</a></h3>
 <div class="paragraph">
 <p>Checks if pg_tle is installed and reports the version. This target:
 - Reports the version from <code>pg_extension</code> if <code>CREATE EXTENSION pg_tle</code> has been run in the database
@@ -1131,10 +1202,10 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.14. run-pgtle</a></h3>
+<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.16. run-pgtle</a></h3>
 <div class="paragraph">
 <p>Registers all extensions with pg_tle by executing the generated pg_tle registration SQL files in a PostgreSQL database. This target:
-- Requires pg_tle extension to be installed (checked via <code>check-pgtle</code>)
+- Requires pg_tle to be installed in the target database. This isn&#8217;t a make-level dependency on <code>check-pgtle</code> — <code>pgtle.sh</code> checks it itself when it runs, and will tell you to run <code>make check-pgtle</code> if pg_tle isn&#8217;t there
 - Uses <code>pgtle.sh</code> to determine which version range directory to use based on the installed pg_tle version
 - Runs all generated SQL files via <code>psql</code> to register your extensions with pg_tle</p>
 </div>
@@ -1453,9 +1524,8 @@ The result is appended to <code>ASCIIDOC_HTML</code> using <code>+=</code>.</p>
 <div class="sect2">
 <h3 id="_document_rules"><a class="anchor" href="#_document_rules"></a><a class="link" href="#_document_rules">6.2. Document Rules</a></h3>
 <div class="paragraph">
-<p>If Asciidoc is found (or <code>$(ASCIIDOC)</code> is set), the <code>html</code> rule will be added as a prerequisite to the <code>install</code> and <code>installchec</code> rules.
-That will ensure that docs are generated for install and test, but only if Asciidoc is available.
-The <code>dist</code> rule will always depend on <code>html</code> though, to ensure html files are up-to-date before creating a distribution.</p>
+<p>If Asciidoc is found (or <code>$(ASCIIDOC)</code> is set), <code>html</code> is added as a dependency of the <code>all</code> target, which both <code>install</code> and <code>installcheck</code> depend on — so docs get built for install and test, but only if Asciidoc is available.
+The <code>dist</code> rule always depends on <code>html</code> directly, regardless of whether Asciidoc was found, to ensure html files are up-to-date before creating a distribution.</p>
 </div>
 <div class="paragraph">
 <p>The <code>html</code> rule simply depends on `$(ASCIIDOC_HTML).
@@ -1470,11 +1540,11 @@ These rules are generated from <code>ASCIIDOC_template</code>:</p>
 <div class="content">
 <pre class="highlight"><code class="language-Makefile" data-lang="Makefile">define ASCIIDOC_template
 %.html: %.$(1) # <b class="conum">(1)</b>
-ifndef ASCIIDOC
+ifeq (,$(strip $(ASCIIDOC)))
 	$$(warning Could not find "asciidoc" or "asciidoctor". Add one of them to your PATH,)
 	$$(warning or set ASCIIDOC to the correct location.)
 	$$(error Could not build %$$@)
-endif # ifndef ASCIIDOC
+endif # ifeq ASCIIDOC
 	$$(ASCIIDOC) $$(ASCIIDOC_FLAGS) $$&lt;
 endef # define ASCIIDOC_template</code></pre>
 </div>
@@ -1490,6 +1560,9 @@ endef # define ASCIIDOC_template</code></pre>
 <p>These rules will <strong>always</strong> exist, even if <code>$(ASCIIDOC)</code> isn&#8217;t set (ie: if Asciidoc wasn&#8217;t found on the system).
 These rules will throw an error if they are run if <code>$(ASCIIDOC)</code> isn&#8217;t defined.
 On a normal user system that should never happen, because the <code>html</code> rule won&#8217;t be included in <code>install</code> or <code>installcheck</code>.</p>
+</div>
+<div class="paragraph">
+<p><code>make docclean</code> removes all generated HTML files (<code>$(DOCS_HTML)</code>). It&#8217;s separate from <code>make clean</code>/<code>make distclean</code>, so you can clear out generated docs without touching your build artifacts.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1623,6 +1696,28 @@ This is only a basic example. Always refer to the <a href="https://github.com/aw
         ├── ext1.sql
         └── ext2.sql</pre>
 </div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_direct_pgtle_sh_invocation"><a class="anchor" href="#_direct_pgtle_sh_invocation"></a><a class="link" href="#_direct_pgtle_sh_invocation">7.5.2. Direct pgtle.sh Invocation</a></h4>
+<div class="paragraph">
+<p><code>pgtle</code>, <code>check-pgtle</code>, and <code>run-pgtle</code> are thin make wrappers around <code>pgtle.sh</code>. For more targeted operations you can run it directly:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>pgtle.sh --extension NAME [--pgtle-version VERSION]</code> — generate registration SQL for one extension (what <code>make pgtle</code> wraps).</p>
+</li>
+<li>
+<p><code>pgtle.sh --get-version</code> — print the pg_tle version installed in the target database (empty if not installed).</p>
+</li>
+<li>
+<p><code>pgtle.sh --get-dir VERSION</code> — print which version-range directory (see <a href="#_version_groupings">Version Groupings</a>) a given pg_tle version maps to, without generating anything.</p>
+</li>
+<li>
+<p><code>pgtle.sh --run</code> — execute the generated registration SQL against the target database (what <code>make run-pgtle</code> wraps).</p>
+</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1833,7 +1928,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-28 12:58:21 -0500
+Last updated 2026-07-29 13:41:25 -0500
 </div>
 </div>
 </body>
