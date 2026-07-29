@@ -1,3 +1,12 @@
+# Include guard: base.mk can end up included twice in a single `make` run
+# (e.g. an extension's own .mk module includes it, and the extension's
+# Makefile also includes it directly via the line setup.sh writes). Without
+# this, every target in the file gets redefined, producing
+# overriding-recipe/ignoring-old-recipe warnings. A second inclusion is a
+# harmless no-op.
+ifndef PGXNTOOL_BASE_MK_INCLUDED
+PGXNTOOL_BASE_MK_INCLUDED := 1
+
 PGXNTOOL_DIR := pgxntool
 
 # Ensure 'all' is the default target (not META.json which happens to be first)
@@ -182,6 +191,52 @@ endif
 # Default mode: pgtap (scans results/*.out for TAP failures)
 PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
 
+# ------------------------------------------------------------------------------
+# check-stale-expected: catch orphaned/unexpected test/expected/ files
+# ------------------------------------------------------------------------------
+# Variable: PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED
+#   - Can be set manually in Makefile or command line
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: "yes" (enabled by default for all pgxntool projects)
+#   - Set to "no" to make this check a complete no-op: the target is
+#     dropped from TEST_DEPS entirely (see its own definition below)
+#
+# Variable: PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
+#   - Sub-check, independent of the variable above: fails if test/expected/
+#     (or test/build/expected/) contains any file that isn't *.out
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: "yes"
+#   - Set to "no" to disable just this sub-check while leaving the rest of
+#     check-stale-expected (the orphaned-.out check) active
+#   - Passed through to check-stale-expected.sh; see that script for the
+#     distinct error message/exit code this sub-check uses
+#
+# Variable: PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT
+#   - Path to the script the check-stale-expected target invokes
+#   - Default: $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
+#   - Exists so a test can swap in a stub script (e.g. one that just records
+#     that it was called) without needing to fake out any other part of
+#     PGXNTOOL_DIR, which many unrelated targets also read. See
+#     pgxntool-test's CLAUDE.md, "Proving a Script Was/Wasn't Invoked"
+#     (under "Testing"), for the pattern this supports.
+#
+# Implementation: See check-stale-expected target definition (search for
+# "check-stale-expected:" in this file)
+#
+ifdef PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED
+  override PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED)
+else
+  PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED = yes
+endif
+
+ifdef PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
+  override PGXNTOOL_CHECK_EXPECTED_FILE_TYPES := $(call pgxntool_validate_yesno,$(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES),PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
+else
+  PGXNTOOL_CHECK_EXPECTED_FILE_TYPES = yes
+endif
+
+PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
+
 # Generate unique database name for tests to prevent conflicts across projects
 # Uses project name + first 5 chars of md5 hash of current directory
 # This prevents multiple test runs in different directories from clobbering each other
@@ -193,6 +248,12 @@ MODULES =# Set to NUL so PGXS doesn't puke
 endif
 
 EXTRA_CLEAN  = $(wildcard ../$(PGXN)-*.zip) pg_tle/
+# PGXS's own pg_regress_clean_files unconditionally rm -rf's a top-level
+# results/, but our tests write to $(TESTOUT)/results/ (see REGRESS_OPTS
+# --outputdir above), so that's the directory that actually needs cleaning.
+# filter-out (not -=, which GNU Make 4.4+ rejects as a parse error) guards
+# against a stray top-level results/ entry while adding the real one.
+EXTRA_CLEAN := $(filter-out results/,$(EXTRA_CLEAN)) $(TESTOUT)/results/
 
 # Get Postgres version, as well as major (9.4, etc) version.
 # NOTE! In at least some versions, PGXS defines VERSION, so we intentionally don't use that variable
@@ -256,6 +317,37 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 #
 # These targets are meant to make running tests easier.
 
+# Build test dependencies list based on enabled features. This base
+# assignment (a plain `=`, not `+=`) must come before any `TEST_DEPS +=`
+# line below -- Make processes the file top-to-bottom, and a later plain
+# `=` would silently wipe out any `+=` that came before it.
+TEST_DEPS = testdeps
+
+# ------------------------------------------------------------------------------
+# check-stale-expected: catch orphaned/unexpected test/expected/ files
+# ------------------------------------------------------------------------------
+# Purpose: test/expected/*.out must mirror test/sql/*.sql 1:1 (likewise
+# test/build/expected/*.out vs test/build/*.sql, when test-build is in use).
+# It's easy to leave a stale .out behind after renaming or removing a .sql
+# file; this makes `make test` fail loudly instead of letting it linger
+# unnoticed. Logic lives in check-stale-expected.sh (enough of it to warrant
+# a real script rather than an inline recipe).
+#
+# This depends on `installcheck` directly (not just position in TEST_DEPS)
+# because it MUST run after pg_regress, not before: TEST_DEPS lists multiple
+# independent prerequisites of `test`, and Make does not guarantee the order
+# unrelated prerequisites of the same target are built in. An explicit
+# dependency edge is the only ordering guarantee Make actually gives.
+#
+# See PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED / PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
+# above for how to disable this entirely or just its non-.out file sub-check.
+ifeq ($(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),yes)
+.PHONY: check-stale-expected
+check-stale-expected: installcheck
+	@$(PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT) $(TESTDIR) $(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
+TEST_DEPS += check-stale-expected
+endif
+
 # make test: run any test dependencies, then do a `make install installcheck`.
 # If regressions are found, it will output them.
 #
@@ -263,8 +355,6 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # watch-make if you're generating intermediate files. If tests end up needing
 # clean it's an indication of a missing dependency anyway.
 .PHONY: test
-# Build test dependencies list based on enabled features
-TEST_DEPS = testdeps
 ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_DEPS += test-build
 endif
@@ -439,10 +529,14 @@ docclean:
 #
 # TAGGING SUPPORT
 #
+# Remote used for tag/rmtag/forcetag/dist. Override on the command line or in
+# your Makefile if you push tags somewhere other than origin.
+PGXN_REMOTE ?= origin
+
 rmtag:
-	git fetch origin # Update our remotes
+	git fetch $(PGXN_REMOTE) # Update our remotes
 	@test -z "$$(git tag --list $(PGXNVERSION))" || git tag -d $(PGXNVERSION)
-	@test -z "$$(git ls-remote --tags origin $(PGXNVERSION) | grep -v '{}')" || git push --delete origin $(PGXNVERSION)
+	@test -z "$$(git ls-remote --tags $(PGXN_REMOTE) $(PGXNVERSION) | grep -v '{}')" || git push --delete $(PGXN_REMOTE) $(PGXNVERSION)
 
 tag:
 	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
@@ -457,7 +551,7 @@ tag:
 	else \
 		git tag $(PGXNVERSION); \
 	fi
-	git push origin $(PGXNVERSION)
+	git push $(PGXN_REMOTE) $(PGXNVERSION)
 
 .PHONY: forcetag
 forcetag: rmtag tag
@@ -506,6 +600,12 @@ pgxntool-sync:
 	@pgxntool/pgxntool-sync.sh
 pgxntool-sync-%:
 	@pgxntool/pgxntool-sync.sh $($@)
+
+# `make pgxntool-version` prints the version of the embedded pgxntool copy.
+# Delegates to bin/version so it can be run without make too.
+.PHONY: pgxntool-version
+pgxntool-version:
+	@$(PGXNTOOL_DIR)/bin/version
 
 # DANGER! Use these with caution. They may add extra crap to your history and
 # could make resolving merges difficult!
@@ -560,3 +660,5 @@ $(DESTDIR)$(datadir)/extension/pgtap.control:
 	pgxn install pgtap --sudo
 
 endif # fndef PGXNTOOL_NO_PGXS_INCLUDE
+
+endif # ifndef PGXNTOOL_BASE_MK_INCLUDED
