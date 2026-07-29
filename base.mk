@@ -601,6 +601,12 @@ pgxntool-sync:
 pgxntool-sync-%:
 	@pgxntool/pgxntool-sync.sh $($@)
 
+# `make pgxntool-version` prints the version of the embedded pgxntool copy.
+# Delegates to bin/version so it can be run without make too.
+.PHONY: pgxntool-version
+pgxntool-version:
+	@$(PGXNTOOL_DIR)/bin/version
+
 # DANGER! Use these with caution. They may add extra crap to your history and
 # could make resolving merges difficult!
 # `pgxntool-sync` (no suffix) already pulls the canonical release; these are the

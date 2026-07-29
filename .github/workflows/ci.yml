@@ -58,12 +58,12 @@ jobs:
             // extension matches (they're workflow definitions with real
             // behavioral weight, some running with pull_request_target
             // privileges). Everything else — including .claude/*.md prompt
-            // and command docs, which carry no execution weight themselves
-            // — counts.
+            // and command docs, and README.html (a generated rendering of
+            // README.asc, no execution weight of its own) — counts.
             //
             // This does NOT skip claude-review: that's a separate workflow
             // gated by its own `if:`, unaffected by this check's outputs.
-            const DOC_EXTENSIONS = /\.(md|asc|adoc|asciidoc)$/i;
+            const DOC_EXTENSIONS = /\.(md|asc|adoc|asciidoc|html)$/i;
             const changedFiles = await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
               repo: context.repo.repo,

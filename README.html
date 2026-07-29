@@ -457,20 +457,22 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_tag">4.7. tag</a></li>
 <li><a href="#_dist">4.8. dist</a></li>
 <li><a href="#_pgxntool_sync">4.9. pgxntool-sync</a></li>
-<li><a href="#_distclean">4.10. distclean</a></li>
-<li><a href="#_pgtle">4.11. pgtle</a></li>
-<li><a href="#_check_pgtle">4.12. check-pgtle</a></li>
-<li><a href="#_run_pgtle">4.13. run-pgtle</a></li>
+<li><a href="#_pgxntool_version">4.10. pgxntool-version</a></li>
+<li><a href="#_distclean">4.11. distclean</a></li>
+<li><a href="#_pgtle">4.12. pgtle</a></li>
+<li><a href="#_check_pgtle">4.13. check-pgtle</a></li>
+<li><a href="#_run_pgtle">4.14. run-pgtle</a></li>
 </ul>
 </li>
 <li><a href="#_version_specific_sql_files">5. Version-Specific SQL Files</a>
 <ul class="sectlevel2">
-<li><a href="#_how_version_files_are_generated">5.1. How Version Files Are Generated</a></li>
-<li><a href="#_what_controls_the_version_number">5.2. What Controls the Version Number</a></li>
-<li><a href="#_committing_version_files">5.3. Committing Version Files</a></li>
-<li><a href="#_alternative_ignoring_version_files">5.4. Alternative: Ignoring Version Files</a></li>
-<li><a href="#_distribution_inclusion">5.5. Distribution Inclusion</a></li>
-<li><a href="#_multiple_versions">5.6. Multiple Versions</a></li>
+<li><a href="#_pgxn_distributions_vs_extensions">5.1. PGXN Distributions vs. Extensions</a></li>
+<li><a href="#_how_version_files_are_generated">5.2. How Version Files Are Generated</a></li>
+<li><a href="#_what_controls_the_version_number">5.3. What Controls the Version Number</a></li>
+<li><a href="#_committing_version_files">5.4. Committing Version Files</a></li>
+<li><a href="#_alternative_ignoring_all_version_files">5.5. Alternative: Ignoring All Version Files</a></li>
+<li><a href="#_distribution_inclusion">5.6. Distribution Inclusion</a></li>
+<li><a href="#_multiple_versions">5.7. Multiple Versions</a></li>
 </ul>
 </li>
 <li><a href="#_document_handling">6. Document Handling</a>
@@ -518,7 +520,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p>PGXNtool is meant to make developing new Postgres extensions for <a href="http://pgxn.org">PGXN</a> easier.</p>
 </div>
 <div class="paragraph">
-<p>Currently, it consists a base Makefile that you can include instead of writing your own, a template META.json, and some test framework. More features will be added over time.</p>
+<p>Currently, it consists a base Makefile that you can include instead of writing your own, a template <code>META.in.json</code> (from which <code>META.json</code> is generated — you edit the former, never the latter directly), and some test framework. More features will be added over time.</p>
 </div>
 <div class="paragraph">
 <p>If you find any bugs or have ideas for improvements, please <a href="https://github.com/decibel/pgxntool/issues"><strong>open an issue</strong></a>.</p>
@@ -802,6 +804,81 @@ PGXNTOOL_ENABLE_TEST_INSTALL = yes  # or no</pre>
 <div class="paragraph">
 <p><strong>Key detail:</strong> Install files and regular tests run in a single <code>pg_regress</code> invocation. This means the database is NOT dropped between install and test phases — state created by install files persists into the main test suite.</p>
 </div>
+<div class="sect3">
+<h4 id="_update_upgrade_uu_testing"><a class="anchor" href="#_update_upgrade_uu_testing"></a><a class="link" href="#_update_upgrade_uu_testing">4.4.1. Update &amp; Upgrade (U&amp;U) Testing</a></h4>
+<div class="paragraph">
+<p>Beyond validating a plain install, it&#8217;s worth testing that your extension behaves correctly across the two transitions every extension with more than one release eventually goes through:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>Update</strong>: <code>ALTER EXTENSION ext UPDATE</code>, moving to a newer extension version on the same PostgreSQL version.</p>
+</li>
+<li>
+<p><strong>Upgrade</strong>: <code>pg_upgrade</code>, moving to a newer PostgreSQL major version while carrying the extension&#8217;s on-disk catalog state along with it.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Both catch bugs that a simple "did the script run without error" check misses — wrong mappings, missing `REVOKE`s, objects that drifted from the base SQL, or catalog state that doesn&#8217;t survive a binary upgrade cleanly. This isn&#8217;t a niche concern that only applies if your extension does something unusual (adds enum types, custom operators, etc.) — it applies to any extension that will ever be updated or upgraded in place, which in practice is every extension.</p>
+</div>
+<div class="paragraph">
+<p><code>test/install</code> is the recommended place to build this, because its "load once, committed, before the suite" mechanic (described above) is exactly what update/upgrade testing needs.</p>
+</div>
+<div class="paragraph">
+<p><strong>The pattern</strong>: load the extension exactly once, committed, from a <code>test/install/*.sql</code> file, in one of several modes selected by a custom backend setting that your <code>Makefile</code> sets via <code>PGOPTIONS</code> (e.g. <code>-c myext.test_load_mode=$(TEST_LOAD_SOURCE)</code>) and that <code>test/install</code> reads with <code>current_setting('myext.test_load_mode')</code>:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>fresh</strong>: <code>CREATE EXTENSION ext;</code></p>
+</li>
+<li>
+<p><strong>update</strong>: <code>CREATE EXTENSION ext VERSION 'oldest_supported';</code> then <code>ALTER EXTENSION ext UPDATE;</code> (to the current <code>default_version</code>, or an explicit intermediate version)</p>
+</li>
+<li>
+<p><strong>existing</strong>: the extension is already installed — by a real <code>pg_upgrade</code>, or an update performed outside the suite — and <code>test/install</code> only asserts it&#8217;s present at the expected version, without dropping or touching it</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The <strong>same</strong> <code>test/sql/<strong></code> suite and the *same</strong> <code>test/expected/<strong></code> output then run unchanged against every mode. Identical expected output passing in *update</strong> mode <strong>is</strong> the update-equivalence assertion — if the updated database behaves any differently than a fresh install, some test will diff. Running that same suite in <strong>existing</strong> mode against a database that just went through a real <code>pg_upgrade</code> gives you upgrade testing using the same test files, no separate suite required.</p>
+</div>
+<div class="paragraph">
+<p>If you adopt this pattern, <code>test/deps.sql</code> should no longer run <code>CREATE EXTENSION</code> itself for the per-test setup — the committed install performed by <code>test/install</code> persists into every (rolled-back) test file, exactly as described above.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why the install step must be committed, not run per-test in <code>test/deps.sql</code>:</strong> every <code>test/sql/</code> file runs inside <code>BEGIN; &#8230;&#8203; ROLLBACK;</code> — a pgxntool convention (<code>test/pgxntool/setup.sql</code> opens the transaction; since it&#8217;s never committed, it rolls back when the session ends). Running the update inside that transaction means the suite never actually exercises a <strong>committed</strong> update — which doesn&#8217;t match production, where <code>ALTER EXTENSION UPDATE</code> commits before anything else touches the database, and it hides bugs that only show up once the update is durably committed. (Modifying an <code>enum</code> is one example of how this can turn into an outright failure rather than just a hidden bug — but it&#8217;s just an example; the reason to commit first holds regardless of what the update script does.)</p>
+</div>
+<div class="paragraph">
+<p>As a bonus, sharing one committed install across every test file also removes the per-test re-install cost.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+This pattern isn&#8217;t (yet) native to pgxntool — you wire up the mode selection and <code>PGOPTIONS</code> plumbing yourself in <code>test/install</code> and your <code>Makefile</code>. First-class support (a standard mode-switching toggle, and scaffolding for real <code>pg_upgrade</code> testing) is planned; see <a href="https://github.com/Postgres-Extensions/pgxntool/issues/42">issue #42</a>.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p><strong>Working examples</strong> (specific files, not full PRs — both extensions' histories include plenty of unrelated changes):</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="https://github.com/Postgres-Extensions/cat_tools/blob/d01c933a3fcbf28d3bdd2bf6f2bd7b116e95e604/test/install/load.sql">cat_tools <code>test/install/load.sql</code></a> and the <code>TEST_LOAD_SOURCE</code> block in its <a href="https://github.com/Postgres-Extensions/cat_tools/blob/d01c933a3fcbf28d3bdd2bf6f2bd7b116e95e604/Makefile"><code>Makefile</code></a> — the fresh/update/existing pattern above, including the <code>PGOPTIONS</code> wiring. This is a reasonably complete example, and somewhat more elaborate than the minimum needed to get started.</p>
+</li>
+<li>
+<p><a href="https://github.com/Postgres-Extensions/pg_count_nulls/blob/9f088ac36f6345023bb5b3d20ad0e4aa6ade0d69/test/sql/extension_tests.sql">pg_count_nulls <code>test/sql/extension_tests.sql</code></a> additionally demonstrates testing an extension installed into a non-default schema. It&#8217;s a useful reference for that specific problem, but it also defines its assertions as plpgsql functions rather than plain pgTAP calls — a pattern that adds complexity of its own and isn&#8217;t recommended as a model for U&amp;U testing itself.</p>
+</li>
+</ul>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_testdeps"><a class="anchor" href="#_testdeps"></a><a class="link" href="#_testdeps">4.5. testdeps</a></h3>
@@ -906,7 +983,7 @@ make PGXNTOOL_ENABLE_VERIFY_RESULTS=no results</pre>
 <div class="sect2">
 <h3 id="_tag"><a class="anchor" href="#_tag"></a><a class="link" href="#_tag">4.7. tag</a></h3>
 <div class="paragraph">
-<p><code>make tag</code> will create a git branch for the current version of your extension, as determined by the META.json file. The reason to do this is so you can always refer to the exact code that went into a released version.</p>
+<p><code>make tag</code> will create an annotated git tag for the current version of your extension, as determined by the META.json file (generated from <code>META.in.json</code> — see <a href="#_pgxn_distributions_vs_extensions">PGXN Distributions vs. Extensions</a>), and push it to <code>origin</code>. The reason to do this is so you can always refer to the exact code that went into a released version.</p>
 </div>
 <div class="paragraph">
 <p>If there&#8217;s already a tag for the current version that probably means you forgot to update META.json, so you&#8217;ll get an error. If you&#8217;re certain you want to over-write the tag, you can do <code>make forcetag</code>, which removes the existing tag (via <code>make rmtag</code>) and creates a new one.</p>
@@ -927,7 +1004,7 @@ You will be very unhappy if you forget to update the .control file for your exte
 <div class="sect2">
 <h3 id="_dist"><a class="anchor" href="#_dist"></a><a class="link" href="#_dist">4.8. dist</a></h3>
 <div class="paragraph">
-<p><code>make dist</code> will create a .zip file for your current version that you can upload to PGXN. The file is named after the PGXN name and version (the top-level "name" and "version" attributes in META.json). The .zip file is placed in the <strong>parent</strong> directory so as not to clutter up your git repo.</p>
+<p><code>make dist</code> will create a .zip file for your current version that you can upload to PGXN. It first runs <code>tag</code> (creating/pushing the version&#8217;s git tag as described above if needed), then uses <code>git archive</code> at that tag to build the .zip file, so the archive always matches the exact tagged commit. The file is named after the PGXN name and version (the top-level "name" and "version" attributes in META.json, generated from <code>META.in.json</code>). The .zip file is placed in the <strong>parent</strong> directory so as not to clutter up your git repo.</p>
 </div>
 <div class="admonitionblock note">
 <table>
@@ -985,9 +1062,27 @@ There is also a <code>pgxntool-sync-%</code> rule if you need to do more advance
 </div>
 </div>
 <div class="sect2">
-<h3 id="_distclean"><a class="anchor" href="#_distclean"></a><a class="link" href="#_distclean">4.10. distclean</a></h3>
+<h3 id="_pgxntool_version"><a class="anchor" href="#_pgxntool_version"></a><a class="link" href="#_pgxntool_version">4.10. pgxntool-version</a></h3>
 <div class="paragraph">
-<p><code>make distclean</code> removes generated configuration files (<code>META.json</code>, <code>meta.mk</code>, <code>control.mk</code>) that survive a normal <code>make clean</code>.</p>
+<p><code>make pgxntool-version</code> prints the version of the embedded pgxntool copy, read from the first line of <code>pgxntool/HISTORY.asc</code>. That line is "STABLE" instead of a version number if this copy was synced from an unreleased commit rather than a tagged release.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Tip</div>
+</td>
+<td class="content">
+The actual work is done by <code>pgxntool/bin/version</code>, so you can run it directly (<code>pgxntool/bin/version</code>) if you&#8217;d rather not go through <code>make</code>.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_distclean"><a class="anchor" href="#_distclean"></a><a class="link" href="#_distclean">4.11. distclean</a></h3>
+<div class="paragraph">
+<p><code>make distclean</code> removes generated configuration files (<code>META.json</code> — generated from <code>META.in.json</code> — plus <code>meta.mk</code> and <code>control.mk</code>) that survive a normal <code>make clean</code>.</p>
 </div>
 <div class="admonitionblock note">
 <table>
@@ -1011,7 +1106,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.11. pgtle</a></h3>
+<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.12. pgtle</a></h3>
 <div class="paragraph">
 <p>Generates pg_tle (Trusted Language Extensions) registration SQL files for deploying extensions in managed environments like AWS RDS/Aurora. See <a href="#_pg_tle_Support">[_pg_tle_Support]</a> for complete documentation.</p>
 </div>
@@ -1020,7 +1115,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.12. check-pgtle</a></h3>
+<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.13. check-pgtle</a></h3>
 <div class="paragraph">
 <p>Checks if pg_tle is installed and reports the version. This target:
 - Reports the version from <code>pg_extension</code> if <code>CREATE EXTENSION pg_tle</code> has been run in the database
@@ -1036,7 +1131,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.13. run-pgtle</a></h3>
+<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.14. run-pgtle</a></h3>
 <div class="paragraph">
 <p>Registers all extensions with pg_tle by executing the generated pg_tle registration SQL files in a PostgreSQL database. This target:
 - Requires pg_tle extension to be installed (checked via <code>check-pgtle</code>)
@@ -1081,14 +1176,36 @@ The <code>pgtle</code> target is a dependency, so <code>make run-pgtle</code> wi
 <p>PGXNtool automatically generates version-specific SQL files from your base SQL file. These files follow the pattern <code>sql/{extension}--{version}.sql</code> and are used by PostgreSQL&#8217;s extension system to install specific versions of your extension.</p>
 </div>
 <div class="sect2">
-<h3 id="_how_version_files_are_generated"><a class="anchor" href="#_how_version_files_are_generated"></a><a class="link" href="#_how_version_files_are_generated">5.1. How Version Files Are Generated</a></h3>
+<h3 id="_pgxn_distributions_vs_extensions"><a class="anchor" href="#_pgxn_distributions_vs_extensions"></a><a class="link" href="#_pgxn_distributions_vs_extensions">5.1. PGXN Distributions vs. Extensions</a></h3>
+<div class="paragraph">
+<p>PGXN distinguishes two things it&#8217;s easy to conflate: a <strong>distribution</strong> and an <strong>extension</strong>. Per <a href="https://pgxn.org/spec/">the PGXN meta spec</a>, a distribution is "a collection of extensions, source code, utilities, tests, and/or documents that are distributed together" — the thing you release and upload to PGXN, identified by the top-level <code>name</code>/<code>version</code> in <code>META.json</code> (generated from <code>META.in.json</code> — you edit the latter, never <code>META.json</code> directly). An extension is the individual thing installed via <code>CREATE EXTENSION</code>, described by its own <code>.control</code> file. A single distribution routinely provides <strong>more than one</strong> extension — <code>META.in.json&#8217;s `provides</code> map lists each one; the pgTAP distribution, for example, provides both the <code>pgtap</code> and <code>schematap</code> extensions from one release.</p>
+</div>
+<div class="paragraph">
+<p>This split matters for versioning, and it&#8217;s where pgxntool has a real gap: <code>META.json&#8217;s top-level `version</code> is the <strong>distribution&#8217;s</strong> release version (used by <code>make tag</code> and <code>make dist</code> — it&#8217;s the git tag name and the <code>.zip</code> filename). Each extension&#8217;s <strong>own</strong> version, though, ends up tracked in <strong>two</strong> separate places that pgxntool does not keep in sync for you:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>the extension&#8217;s <code>.control</code> file (<code>default_version</code>) — what PostgreSQL and pgxntool&#8217;s own build actually use; see <a href="#_what_controls_the_version_number">What Controls the Version Number</a> below</p>
+</li>
+<li>
+<p>that extension&#8217;s entry under <code>META.in.json&#8217;s `provides</code> map (<code>provides.{extension}.version</code>) — which the PGXN meta spec defines as "a Version for the extension" in its own right, <strong>not</strong> the distribution&#8217;s version, and which is what PGXN&#8217;s public index reads</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Nothing generates one from the other or checks that they still agree, so it&#8217;s easy to bump one and forget the other; <a href="https://github.com/Postgres-Extensions/pgxntool/issues/47">issue #47</a> tracks fixing that.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_how_version_files_are_generated"><a class="anchor" href="#_how_version_files_are_generated"></a><a class="link" href="#_how_version_files_are_generated">5.2. How Version Files Are Generated</a></h3>
 <div class="paragraph">
 <p>When you run <code>make</code> (or <code>make all</code>), PGXNtool:</p>
 </div>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Reads your <code>META.json</code> file to determine the extension version from <code>provides.{extension}.version</code></p>
+<p>Reads each extension&#8217;s own <code>.control</code> file to determine its version from <code>default_version</code> (via <code>control.mk.sh</code>)</p>
 </li>
 <li>
 <p>Generates a Makefile rule that copies your base SQL file (<code>sql/{extension}.sql</code>) to the version-specific file (<code>sql/{extension}--{version}.sql</code>)</p>
@@ -1099,16 +1216,11 @@ The <code>pgtle</code> target is a dependency, so <code>make run-pgtle</code> wi
 </ol>
 </div>
 <div class="paragraph">
-<p>For example, if your <code>META.json</code> contains:</p>
+<p>For example, if your <code>myext.control</code> contains:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>"provides": {
-  "myext": {
-    "version": "1.2.3",
-    ...
-  }
-}</pre>
+<pre>default_version = '1.2.3'</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1116,21 +1228,22 @@ The <code>pgtle</code> target is a dependency, so <code>make run-pgtle</code> wi
 </div>
 </div>
 <div class="sect2">
-<h3 id="_what_controls_the_version_number"><a class="anchor" href="#_what_controls_the_version_number"></a><a class="link" href="#_what_controls_the_version_number">5.2. What Controls the Version Number</a></h3>
+<h3 id="_what_controls_the_version_number"><a class="anchor" href="#_what_controls_the_version_number"></a><a class="link" href="#_what_controls_the_version_number">5.3. What Controls the Version Number</a></h3>
 <div class="paragraph">
-<p>The version number comes from <code>META.json</code> → <code>provides.{extension}.version</code>, <strong>not</strong> from your <code>.control</code> file&#8217;s <code>default_version</code> field. The <code>.control</code> file&#8217;s <code>default_version</code> is used by PostgreSQL to determine which version to install by default, but the actual version-specific file that gets generated is determined by what&#8217;s in <code>META.json</code>.</p>
+<p>The version number comes from each extension&#8217;s <strong>own</strong> <code>.control</code> file → <code>default_version</code>, <strong>not</strong> from <code>META.json</code>. PostgreSQL itself uses <code>default_version</code> to pick which versioned SQL file to load, so <code>control.mk.sh</code> parses the <code>.control</code> file(s) directly to keep the generated filename in sync with what PostgreSQL will actually use. <code>META.in.json</code> has its own, separate <code>provides.{extension}.version</code> for that same extension (see <a href="#_pgxn_distributions_vs_extensions">PGXN Distributions vs. Extensions</a> above) — pgxntool never reads it when generating SQL files, and nothing keeps it in sync with the <code>.control</code> file&#8217;s <code>default_version</code>.</p>
 </div>
 <div class="paragraph">
-<p>To change the version of your extension:
-1. Update <code>provides.{extension}.version</code> in <code>META.json</code>
+<p>To change the version of one of your extensions:
+1. Update <code>default_version</code> in that extension&#8217;s <code>.control</code> file
 2. Run <code>make</code> to regenerate the version-specific file
-3. Update <code>default_version</code> in your <code>.control</code> file to match (if needed)</p>
+3. Update that extension&#8217;s <code>provides.{extension}.version</code> in <code>META.in.json</code> to match by hand, and regenerate <code>META.json</code> (<code>make META.json</code>) — pgxntool won&#8217;t do this for you
+4. Update <code>META.in.json&#8217;s top-level `version</code> too if you&#8217;re also cutting a new distribution release</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_committing_version_files"><a class="anchor" href="#_committing_version_files"></a><a class="link" href="#_committing_version_files">5.3. Committing Version Files</a></h3>
+<h3 id="_committing_version_files"><a class="anchor" href="#_committing_version_files"></a><a class="link" href="#_committing_version_files">5.4. Committing Version Files</a></h3>
 <div class="paragraph">
-<p>Version-specific SQL files are now treated as permanent files that should be committed to your repository. This makes it much easier to test updates to extensions, as you can see exactly what SQL was included in each version.</p>
+<p>Version-specific SQL files are treated as permanent files that should be committed to your repository by default. This makes it much easier to test updates to extensions, as you can see exactly what SQL was included in each version.</p>
 </div>
 <div class="admonitionblock important">
 <table>
@@ -1144,9 +1257,82 @@ These files are auto-generated and include a header comment warning not to edit 
 </tr>
 </table>
 </div>
+<div class="sect3">
+<h4 id="_why_commit_them_update_testing"><a class="anchor" href="#_why_commit_them_update_testing"></a><a class="link" href="#_why_commit_them_update_testing">5.4.1. Why Commit Them: Update Testing</a></h4>
+<div class="paragraph">
+<p>The primary value of committing a version&#8217;s install script is <strong>update testing</strong>: with the file in place, you can install that exact version (<code>CREATE EXTENSION ext VERSION 'x.y.z'</code>), run <code>ALTER EXTENSION ext UPDATE</code>, and verify the update path actually works. In principle you would only ever need the very first committed version&#8217;s install script — every later version is reachable by chaining upgrade scripts from it. See <a href="#_testinstall">test/install</a> for how to wire this into your test suite.</p>
+</div>
+<div class="paragraph">
+<p>In practice, you should keep <strong>most</strong> old versions tracked rather than relying purely on that chain, because you cannot predict when a new <strong>major PostgreSQL version</strong> will break the ability to install an <strong>older</strong> extension version — a system catalog column changes type, a <code>SELECT *</code> over a catalog starts failing, and so on. Committing the old version&#8217;s install script lets CI catch that regression directly, by attempting to install that exact historical version against the new PostgreSQL release. For any non-trivial extension, most old versions should stay tracked for this reason alone.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_when_its_ok_to_skip_a_version"><a class="anchor" href="#_when_its_ok_to_skip_a_version"></a><a class="link" href="#_when_its_ok_to_skip_a_version">5.4.2. When It&#8217;s OK to Skip a Version</a></h4>
+<div class="paragraph">
+<p>For a <strong>minor version change that doesn&#8217;t meaningfully alter the extension</strong> (e.g. a small bug fix), it&#8217;s unlikely to straddle a PostgreSQL supported-version boundary, so there&#8217;s much less test-coverage value in committing that specific version&#8217;s generated install script. For large extensions, deliberately not committing some of these individual version files is worth doing to keep repository size down — the base <code>sql/{extension}.sql</code> still fully captures the change in git history, and the install script itself is trivially regenerated from that base file at build time.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_dont_gitignore_a_skipped_version_rm_it_once"><a class="anchor" href="#_dont_gitignore_a_skipped_version_rm_it_once"></a><a class="link" href="#_dont_gitignore_a_skipped_version_rm_it_once">5.4.3. Don&#8217;t <code>.gitignore</code> a Skipped Version — <code>rm</code> It Once</a></h4>
+<div class="paragraph">
+<p>When you decide not to track a particular version&#8217;s generated install script, do <strong>not</strong> add a <code>.gitignore</code> entry for it.</p>
+</div>
+<div class="paragraph">
+<p><code>make</code> only ever generates the <strong>current</strong> version&#8217;s file, stamped from the base source according to that extension&#8217;s <code>.control</code> file <code>default_version</code>. The moment you bump the version, <code>make</code> starts generating the <strong>new</strong> current version&#8217;s file and stops touching the old one — the old file left behind in your working tree is a stale, one-off artifact, not something <code>make</code> keeps recreating on every build.</p>
+</div>
+<div class="paragraph">
+<p>Because it&#8217;s only ever transiently present, the correct cleanup is a single <code>rm sql/{extension}--{old-version}.sql</code> right after the version bump — not a permanent <code>.gitignore</code> rule. A per-version <code>.gitignore</code> line would be perpetual clutter added on every release, for a file that&#8217;s only ever present for one build cycle. A broad glob (e.g. <code>sql/<strong>--</strong>.sql</code>) is wrong for the same reason it&#8217;s wrong below in <a href="#_alternative_ignoring_all_version_files">Alternative: Ignoring All Version Files</a>: it would also hide the prior-version install scripts and upgrade scripts (<code>sql/{extension}--{a}--{b}.sql</code>) that you <strong>do</strong> want tracked and visible in <code>git status</code>.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_never_hand_edit_a_version_file_thats_no_longer_current"><a class="anchor" href="#_never_hand_edit_a_version_file_thats_no_longer_current"></a><a class="link" href="#_never_hand_edit_a_version_file_thats_no_longer_current">5.4.4. Never Hand-Edit a Version File That&#8217;s No Longer Current</a></h4>
+<div class="paragraph">
+<p><code>control.mk.sh</code> generates a Make rule along these lines for the current version&#8217;s file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$(EXTENSION_ext_VERSION_FILE): sql/ext.sql extension.control
+	@echo '/* DO NOT EDIT - AUTO-GENERATED FILE */' &gt; $(EXTENSION_ext_VERSION_FILE)
+	@cat sql/ext.sql &gt;&gt; $(EXTENSION_ext_VERSION_FILE)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That rule only ever targets the file matching the extension&#8217;s <strong>current</strong> <code>default_version</code>, so editing the base <code>sql/{extension}.sql</code> and running <code>make</code> is the correct, safe way to change that one file.</p>
+</div>
+<div class="paragraph">
+<p>Every <strong>other</strong> versioned file — any <code>sql/{extension}--{version}.sql</code> where <code>{version}</code> is no longer current — is a frozen historical record, not something <code>make</code> will ever regenerate or overwrite again. Its entire purpose is to preserve exactly what shipped in that version (see <a href="#_why_commit_them_update_testing">Why Commit Them: Update Testing</a> above), so it can keep being used to test update paths and PostgreSQL-version compatibility against exactly what your users actually installed.</p>
+</div>
+<div class="paragraph">
+<p><strong>Hand-editing an old versioned file directly is never correct</strong> — it silently corrupts that historical record. If you need to change behavior after a version has already shipped, bump the version and add a proper <code>sql/{extension}--{old}--{new}.sql</code> upgrade script instead. Never edit <code>sql/{extension}--{old}.sql</code> in place.</p>
+</div>
+<div class="admonitionblock caution">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Caution</div>
+</td>
+<td class="content">
+This is especially relevant for AI coding agents, which won&#8217;t know this convention exists unless it&#8217;s spelled out. The generic <code>DO NOT EDIT - AUTO-GENERATED FILE</code> header on every version file doesn&#8217;t distinguish "regenerated on every build" (the current version) from "was generated once, now frozen" (every other version). An agent without this context may reasonably — but incorrectly — treat any auto-generated file as fair game to patch directly. Old versioned SQL files must instead be treated as append-only history: the fix is always a new version plus an upgrade script, never an in-place edit.
+</td>
+</tr>
+</table>
+</div>
+</div>
 </div>
 <div class="sect2">
-<h3 id="_alternative_ignoring_version_files"><a class="anchor" href="#_alternative_ignoring_version_files"></a><a class="link" href="#_alternative_ignoring_version_files">5.4. Alternative: Ignoring Version Files</a></h3>
+<h3 id="_alternative_ignoring_all_version_files"><a class="anchor" href="#_alternative_ignoring_all_version_files"></a><a class="link" href="#_alternative_ignoring_all_version_files">5.5. Alternative: Ignoring All Version Files</a></h3>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+This is a different, all-or-nothing choice from <a href="#_when_its_ok_to_skip_a_version">When It&#8217;s OK to Skip a Version</a> above, where the recommendation is to keep tracking most versions and selectively skip only a few low-value minor ones. This section instead covers not tracking <strong>any</strong> version-specific files at all.
+</td>
+</tr>
+</table>
+</div>
 <div class="paragraph">
 <p>If you prefer not to commit version-specific SQL files, you must add them to your <code>.gitignore</code> to prevent <code>make dist</code> from failing due to untracked files. Add the following to your <code>.gitignore</code>:</p>
 </div>
@@ -1174,13 +1360,13 @@ If you ignore version files instead of committing them, they will NOT be include
 </div>
 </div>
 <div class="sect2">
-<h3 id="_distribution_inclusion"><a class="anchor" href="#_distribution_inclusion"></a><a class="link" href="#_distribution_inclusion">5.5. Distribution Inclusion</a></h3>
+<h3 id="_distribution_inclusion"><a class="anchor" href="#_distribution_inclusion"></a><a class="link" href="#_distribution_inclusion">5.6. Distribution Inclusion</a></h3>
 <div class="paragraph">
 <p>Version-specific files are included in distributions created by <code>make dist</code> only if they are committed to git. Since <code>make dist</code> uses <code>git archive</code>, only tracked files are included in the distribution archive.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_multiple_versions"><a class="anchor" href="#_multiple_versions"></a><a class="link" href="#_multiple_versions">5.6. Multiple Versions</a></h3>
+<h3 id="_multiple_versions"><a class="anchor" href="#_multiple_versions"></a><a class="link" href="#_multiple_versions">5.7. Multiple Versions</a></h3>
 <div class="paragraph">
 <p>If you need to support multiple versions of your extension:</p>
 </div>
@@ -1193,7 +1379,7 @@ If you ignore version files instead of committing them, they will NOT be include
 <p>Create upgrade scripts for version transitions (e.g., <code>sql/myext&#8212;&#8203;1.0.0&#8212;&#8203;1.1.0.sql</code>)</p>
 </li>
 <li>
-<p>Update <code>META.json</code> to reflect the current version you&#8217;re working on</p>
+<p>Update <code>default_version</code> in the extension&#8217;s <code>.control</code> file to reflect the current version you&#8217;re working on</p>
 </li>
 <li>
 <p>Commit all version files and upgrade scripts to your repository</p>
@@ -1201,7 +1387,7 @@ If you ignore version files instead of committing them, they will NOT be include
 </ol>
 </div>
 <div class="paragraph">
-<p>The version file for the current version (specified in <code>META.json</code>) will be automatically regenerated when you run <code>make</code>, but other version files you create manually will be preserved.</p>
+<p>The version file for the current version (specified in the <code>.control</code> file&#8217;s <code>default_version</code>) will be automatically regenerated when you run <code>make</code>, but other version files you create manually will be preserved.</p>
 </div>
 </div>
 </div>
@@ -1647,7 +1833,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-26 15:06:30 -0500
+Last updated 2026-07-28 12:58:21 -0500
 </div>
 </div>
 </body>
