@@ -280,12 +280,11 @@ Generated files depend on:
 
 ## Scripts
 
-Each `*.sh` script in this directory's root (`setup.sh`, `build_meta.sh`, `meta.mk.sh`,
-`control.mk.sh`, `pgxntool-sync.sh`, `update-setup-files.sh`, `pgtle.sh`, etc.) begins with
-a shebang followed by a short header comment describing its purpose within the first ~10
-lines — read that header rather than relying on a hand-maintained list here. Exception:
-`JSON.sh` (third-party, MIT licensed) and `safesed` are trivial utilities without such a
-header.
+Each `*.sh` script in this directory's root begins with a shebang followed by a short
+header comment describing its purpose within the first ~10 lines — read that header
+rather than relying on a hand-maintained list here, which would just go stale the same
+way this section itself once did. Exception: trivial third-party or one-line utilities
+may lack such a header.
 
 ## Related Repositories
 
