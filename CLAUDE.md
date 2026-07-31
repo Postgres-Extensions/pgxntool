@@ -280,7 +280,7 @@ Generated files depend on:
 
 ## Scripts
 
-Each script in this directory's root begins with a shebang followed by a short
+Each script at the top level of this repository (pgxntool/) begins with a shebang followed by a short
 header comment describing its purpose within the first ~10 lines — read that header
 rather than relying on a hand-maintained list here, which would just go stale the same
 way this section itself once did. Exception: trivial third-party or one-line utilities
