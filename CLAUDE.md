@@ -219,7 +219,7 @@ When tests fail, examine the diff output carefully. The actual test output in `t
 
 pgxntool can generate pg_tle (Trusted Language Extensions) registration SQL for deploying extensions in AWS RDS/Aurora without filesystem access.
 
-**Usage:** `make pgtle` or `make pgtle PGTLE_VERSION=1.5.0+`
+**Usage:** `make pgtle` or `make pgtle PGXNTOOL_PGTLE_VERSION=1.5.0+`
 
 **Output:** `pg_tle/{version_range}/{extension}.sql`
 
