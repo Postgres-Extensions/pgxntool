@@ -421,11 +421,15 @@ PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
 # Depend on control.mk (which defines EXTENSION__CURRENT_VERSION__FILES)
 # Depend on control files explicitly so changes trigger rebuilds
 # Generates all supported pg_tle versions for each extension, unless
-# PGTLE_VERSION is set on the command line to limit output to one range
+# PGXNTOOL_PGTLE_VERSION is set on the command line to limit output to one
+# range. Deliberately not named PGTLE_VERSION: make auto-imports same-named
+# environment variables, and PGTLE_VERSION is a natural name for a CI job's
+# "which pg_tle to test against" env var (see issue #78) -- that collided
+# with this variable silently instead of erroring.
 .PHONY: pgtle
 pgtle: all control.mk $(PGXNTOOL_CONTROL_FILES)
 	@$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
-		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext) $(if $(PGTLE_VERSION),--pgtle-version $(PGTLE_VERSION));)
+		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext) $(if $(PGXNTOOL_PGTLE_VERSION),--pgtle-version $(PGXNTOOL_PGTLE_VERSION));)
 
 #
 # pg_tle installation support

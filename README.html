@@ -500,7 +500,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <ul class="sectlevel2">
 <li><a href="#_pgxn_remote">8.1. PGXN_REMOTE</a></li>
 <li><a href="#_asciidoc">8.2. ASCIIDOC</a></li>
-<li><a href="#_pgtle_version">8.3. PGTLE_VERSION</a></li>
+<li><a href="#_pgxntool_pgtle_version">8.3. PGXNTOOL_PGTLE_VERSION</a></li>
 <li><a href="#_pg_config">8.4. PG_CONFIG</a></li>
 <li><a href="#_testdir">8.5. TESTDIR</a></li>
 <li><a href="#_testout">8.6. TESTOUT</a></li>
@@ -1199,11 +1199,11 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 <p><code>make pgtle</code> generates SQL files in <code>pg_tle/</code> subdirectories organized by pg_tle version ranges. For version range details, see <code>pgtle_versions.md</code>.</p>
 </div>
 <div class="paragraph">
-<p>Set <code>PGTLE_VERSION</code> on the command line to limit generation to the single version range that value falls into, instead of every known range:</p>
+<p>Set <code>PGXNTOOL_PGTLE_VERSION</code> on the command line to limit generation to the single version range that value falls into, instead of every known range:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>make pgtle PGTLE_VERSION=1.5.0</pre>
+<pre>make pgtle PGXNTOOL_PGTLE_VERSION=1.5.0</pre>
 </div>
 </div>
 </div>
@@ -1887,9 +1887,9 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgtle_version"><a class="anchor" href="#_pgtle_version"></a><a class="link" href="#_pgtle_version">8.3. PGTLE_VERSION</a></h3>
+<h3 id="_pgxntool_pgtle_version"><a class="anchor" href="#_pgxntool_pgtle_version"></a><a class="link" href="#_pgxntool_pgtle_version">8.3. PGXNTOOL_PGTLE_VERSION</a></h3>
 <div class="paragraph">
-<p>Default: unset (generates every known pg_tle version range). Set on the command line to limit <code>make pgtle</code> to the single version range this value falls into. See <a href="#_pgtle">pgtle</a>.</p>
+<p>Default: unset (generates every known pg_tle version range). Set on the command line to limit <code>make pgtle</code> to the single version range this value falls into. Not named <code>PGTLE_VERSION</code>: make auto-imports same-named environment variables, and that name collided silently with CI jobs that set a <code>PGTLE_VERSION</code> env var for an unrelated purpose (which pg_tle to test against). See <a href="#_pgtle">pgtle</a>.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1983,7 +1983,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-31 15:10:57 -0500
+Last updated 2026-07-31 16:13:06 -0500
 </div>
 </div>
 </body>
