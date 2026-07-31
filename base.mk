@@ -46,7 +46,14 @@ control.mk: $(PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOO
 
 -include control.mk
 
-DATA         = $(EXTENSION__CURRENT_VERSION__FILES) $(wildcard sql/*--*--*.sql)
+# $(wildcard sql/*--*.sql) covers both upgrade scripts (ext--a--b.sql) and
+# historical full-install scripts (ext--a.sql); EXTENSION__CURRENT_VERSION__FILES
+# is also matched by it but is listed explicitly since it's a generated file
+# that must exist as a prerequisite before the wildcard can see it. $(sort)
+# dedupes the resulting overlap -- without it, `install` is invoked with the
+# current-version file listed twice and refuses to overwrite the copy it
+# just created, failing `make install` outright.
+DATA         = $(sort $(EXTENSION__CURRENT_VERSION__FILES) $(wildcard sql/*--*.sql))
 DOC_DIRS	+= doc
 # NOTE: if this is empty it gets forcibly defined to NUL before including PGXS
 DOCS		+= $(foreach dir,$(DOC_DIRS),$(wildcard $(dir)/*))
