@@ -314,6 +314,17 @@ DATA += $(wildcard *.control)
 .IGNORE: installcheck
 installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/
 
+# installcheck must run after install: pg_regress needs the extension already
+# installed (CREATE EXTENSION requires the control/SQL files to be in place).
+# PGXS's own installcheck target doesn't declare that dependency -- it assumes
+# the caller runs `make install installcheck` manually. That assumption breaks
+# when something else (e.g. check-stale-expected below) depends on installcheck
+# directly: `test`'s TEST_DEPS lists install/installcheck as independent,
+# unordered prerequisites, so nothing stops installcheck's own prerequisite
+# chain from running before install. An explicit edge here, same as
+# check-stale-expected's, is the only ordering guarantee Make actually gives.
+installcheck: install
+
 #
 # TEST SUPPORT
 #
@@ -362,7 +373,7 @@ TEST_DEPS += test-build
 endif
 TEST_DEPS += install installcheck
 test: $(TEST_DEPS)
-	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; fi
+	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; exit 1; fi
 
 #
 # verify-results: Safeguard for make results
@@ -386,18 +397,27 @@ verify-results:
 endif
 endif
 
-# make results: runs `make test` and copies all result files to expected.
+# make results: runs the same steps as `make test` and copies all result files
+# to expected.
 # DO NOT RUN THIS UNLESS YOU'RE CERTAIN ALL YOUR TESTS ARE PASSING!
 #
-# Dependency chain (verify-results: test) guarantees test completes before verify-results
-# checks regression.diffs, even under make -j. Listing both as independent prerequisites
-# of results would allow them to run concurrently, letting verify-results see stale state.
+# Depends on $(TEST_DEPS) directly rather than on `test` itself: `test`'s own
+# recipe now exits non-zero as soon as it sees a regression.diffs mismatch
+# (see `test:` above), which would abort this chain before verify-results ever
+# got a chance to inspect the diff and report it properly. verify-results (or
+# the plain diffs check below, when disabled) is the one that's supposed to
+# decide pass/fail here, not `test`.
+#
+# Dependency chain (verify-results: $(TEST_DEPS)) guarantees those complete
+# before verify-results checks regression.diffs, even under make -j. Listing
+# them as independent prerequisites of results would allow them to run
+# concurrently, letting verify-results see stale state.
 .PHONY: results
 ifeq ($(PGXNTOOL_ENABLE_VERIFY_RESULTS),yes)
-verify-results: test
+verify-results: $(TEST_DEPS)
 results: verify-results
 else
-results: test
+results: $(TEST_DEPS)
 endif
 	@mkdir -p $(TESTDIR)/expected
 	@for f in $(TESTOUT)/results/*.out; do \
