@@ -479,6 +479,42 @@ check-pgtle:
 run-pgtle: pgtle
 	@$(PGXNTOOL_DIR)/pgtle.sh --run
 
+# Print generated pg_tle registration SQL to stdout, for consumers building
+# a combined multi-extension install file, e.g.:
+#   $(MAKE) --no-print-directory -C ../deps/cat_tools print-pgtle >> pgtle-all.sql
+# --no-print-directory is required: GNU Make auto-prints "Entering
+# directory"/"Leaving directory" to stdout for recursive invocations like
+# this one, which would otherwise corrupt the redirected file.
+# Depends on 'pgtle' so the SQL files are (re)generated first.
+# Selects the directory via PGXNTOOL_PGTLE_TARGET_VERSION if set (an actual
+# pg_tle version like 1.5.2, not a range), otherwise via the installed
+# version (pgtle.sh --get-version). Deliberately not named PGTLE_VERSION or
+# reusing PGXNTOOL_PGTLE_VERSION: a CI job's PGTLE_VERSION env var means
+# "which pg_tle to test against," a concept that can legitimately diverge
+# from "which version this printed artifact should target" -- collapsing
+# them would silently produce a plausible-but-wrong artifact on divergence.
+# PGXNTOOL_PGTLE_VERSION itself holds a range (e.g. 1.5.0+), not an exact
+# version, so it can't be reused here either.
+.PHONY: print-pgtle
+print-pgtle: pgtle
+	@version="$(PGXNTOOL_PGTLE_TARGET_VERSION)"; \
+	if [ -z "$$version" ]; then \
+		version=$$($(PGXNTOOL_DIR)/pgtle.sh --get-version 2>/dev/null); \
+		if [ -z "$$version" ]; then \
+			echo "ERROR: pg_tle version not specified and pg_tle is not installed" >&2; \
+			echo "       Set PGXNTOOL_PGTLE_TARGET_VERSION=X.Y.Z, or run 'CREATE EXTENSION pg_tle;' first" >&2; \
+			exit 1; \
+		fi; \
+	fi; \
+	pgtle_dir=$$($(PGXNTOOL_DIR)/pgtle.sh --get-dir "$$version") || exit 1; \
+	$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+		f="$$pgtle_dir/$(ext).sql"; \
+		if [ ! -f "$$f" ]; then \
+			echo "ERROR: $$f does not exist (run 'make pgtle' first)" >&2; \
+			exit 1; \
+		fi; \
+		cat "$$f";)
+
 # These targets ensure all the relevant directories exist
 $(TESTDIR)/sql $(TESTDIR)/expected/ $(TESTOUT)/results/:
 	@mkdir -p $@
