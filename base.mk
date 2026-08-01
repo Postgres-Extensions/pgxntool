@@ -759,6 +759,15 @@ endif
 # $(DESTDIR)$(datadir) aren't being expanded. This can probably change after
 # the META handling stuff is it's own makefile.
 #
+#
+# This declaration is deliberately OUTSIDE the ifeq below (unlike e.g.
+# check-stale-expected's own .PHONY, which lives inside its ifeq): testdeps'
+# own `testdeps: pgtap` prerequisite (see testdeps' definition) is
+# unconditional, so pgtap must always resolve to *some* rule. Without this
+# unconditional .PHONY, disabling the block below would leave `pgtap`
+# completely undefined, and testdeps would fail with "No rule to make
+# target 'pgtap'". An empty phony rule (no prerequisites, no recipe) is
+# exactly the harmless no-op that's needed in that case.
 .PHONY: pgtap
 # Gated behind PGXNTOOL_ENABLE_PGXN_INSTALL (see its definition above): when
 # disabled, pgtap is a no-op and pg_regress runs assuming pgtap is already
