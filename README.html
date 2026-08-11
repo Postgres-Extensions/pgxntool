@@ -507,10 +507,12 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_pgxntool_verify_results_mode">8.7. PGXNTOOL_VERIFY_RESULTS_MODE</a></li>
 <li><a href="#_pgxntool_enable_test_build">8.8. PGXNTOOL_ENABLE_TEST_BUILD *</a></li>
 <li><a href="#_pgxntool_enable_test_install">8.9. PGXNTOOL_ENABLE_TEST_INSTALL *</a></li>
-<li><a href="#_pgxntool_enable_verify_results">8.10. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
-<li><a href="#_pgxntool_enable_check_stale_expected">8.11. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></li>
-<li><a href="#_pgxntool_check_expected_file_types">8.12. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></li>
-<li><a href="#_pgxntool_no_pgxs_include">8.13. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
+<li><a href="#_pgxntool_enable_fs_install">8.10. PGXNTOOL_ENABLE_FS_INSTALL *</a></li>
+<li><a href="#_pgxntool_enable_pgxn_install">8.11. PGXNTOOL_ENABLE_PGXN_INSTALL *</a></li>
+<li><a href="#_pgxntool_enable_verify_results">8.12. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
+<li><a href="#_pgxntool_enable_check_stale_expected">8.13. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></li>
+<li><a href="#_pgxntool_check_expected_file_types">8.14. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></li>
+<li><a href="#_pgxntool_no_pgxs_include">8.15. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
 </ul>
 </li>
 <li><a href="#_copyright">9. Copyright</a></li>
@@ -635,10 +637,25 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <div class="title">Note</div>
 </td>
 <td class="content">
+<code>test</code> exits non-zero (after printing <code>regression.diffs</code>) if any test fails. Previously it always exited 0 regardless of test results, silently masking failures from CI and other automation that relies on the exit code.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
 While you can still run <code>make installcheck</code> or any other valid PGXS make target directly, it&#8217;s recommended to use <code>make test</code> when using pgxntool. The <code>test</code> target ensures proper test isolation and correct dependency installation.
 </td>
 </tr>
 </table>
+</div>
+<div class="paragraph">
+<p>Whether <code>test</code>/<code>installcheck</code>/<code>verify-results</code> filesystem-install the extension first is controlled by <code>PGXNTOOL_ENABLE_FS_INSTALL</code>, and whether <code>installcheck</code> auto-installs the pgtap dependency via <code>pgxn install</code> is controlled by <code>PGXNTOOL_ENABLE_PGXN_INSTALL</code> — see <a href="#_pgxntool_enable_fs_install">PGXNTOOL_ENABLE_FS_INSTALL *</a> and <a href="#_pgxntool_enable_pgxn_install">PGXNTOOL_ENABLE_PGXN_INSTALL *</a> for "existing mode"/pg_tle-style testing, where the extension (and/or pgtap) was deployed some other way and a filesystem install would defeat the point of the test.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1071,7 +1088,7 @@ If your project has a <code>.gitattributes</code> file, <code>make dist</code>/<
 <div class="sect2">
 <h3 id="_pgxntool_sync"><a class="anchor" href="#_pgxntool_sync"></a><a class="link" href="#_pgxntool_sync">4.9. pgxntool-sync</a></h3>
 <div class="paragraph">
-<p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge.</p>
+<p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge (it also verifies the <code>test/pgxntool</code> symlink, recreating it if missing).</p>
 </div>
 <div class="admonitionblock note">
 <table>
@@ -1941,13 +1958,25 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.10. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
+<h3 id="_pgxntool_enable_fs_install"><a class="anchor" href="#_pgxntool_enable_fs_install"></a><a class="link" href="#_pgxntool_enable_fs_install">8.10. PGXNTOOL_ENABLE_FS_INSTALL *</a></h3>
+<div class="paragraph">
+<p>Default: <code>yes</code>. Controls whether <code>install</code> is a prerequisite of <code>test</code>/<code>verify-results</code>, and whether <code>installcheck</code> depends on <code>install</code>. Set to <code>no</code> for "existing mode" testing, where the extension under test was deployed some other way (e.g. registered via pg_tle instead of the filesystem, or installed by a binary pg_upgrade)&#8201;&#8212;&#8201;with this set, <code>make test</code>/<code>make installcheck</code>/<code>make verify-results</code> run against whatever is already installed instead of filesystem-installing first.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_enable_pgxn_install"><a class="anchor" href="#_pgxntool_enable_pgxn_install"></a><a class="link" href="#_pgxntool_enable_pgxn_install">8.11. PGXNTOOL_ENABLE_PGXN_INSTALL *</a></h3>
+<div class="paragraph">
+<p>Default: follows <code>PGXNTOOL_ENABLE_FS_INSTALL</code> (so it&#8217;s off automatically whenever filesystem install is off), but can be set independently. Controls whether <code>installcheck</code> auto-installs the pgtap dependency via <code>pgxn install pgtap --sudo</code> when it isn&#8217;t already filesystem-installed. Set to <code>no</code> to make this a complete no-op, e.g. when pgtap is already provided some other way and you don&#8217;t want a <code>sudo pgxn install</code> invoked as a side effect of testing.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.12. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Enables or disables the <a href="#_verify_results_safeguard">verify-results safeguard</a> that blocks <code>make results</code> when tests are failing. Setting it to empty on the command line (<code>make PGXNTOOL_ENABLE_VERIFY_RESULTS= results</code>) also disables it.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.11. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
+<h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.13. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Enables or disables the check-stale-expected safeguard, which fails <code>make test</code> if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains a <code>.out</code> file with no corresponding <code>.sql</code> file&#8201;&#8212;&#8201;catching a stale file left behind after a test was renamed or removed. Set to <code>no</code> to make the check a complete no-op (it&#8217;s dropped from <code>TEST_DEPS</code> entirely).</p>
 </div>
@@ -1956,13 +1985,13 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.12. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
+<h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.14. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Sub-check of check-stale-expected, independent of <code>PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED</code>: fails (with a distinct error message and exit code from the orphaned-<code>.out</code> check) if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains any file that isn&#8217;t <code>*.out</code>. Set to <code>no</code> to disable just this sub-check while leaving the orphaned-<code>.out</code> check active.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.13. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
+<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.15. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
 <div class="paragraph">
 <p>Default: unset (PGXS is included normally). Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced scenarios where you need to manage the PGXS include yourself; most projects should never set this.</p>
 </div>
@@ -1983,7 +2012,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-31 16:13:06 -0500
+Last updated 2026-08-01 16:35:52 -0500
 </div>
 </div>
 </body>

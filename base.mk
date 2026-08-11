@@ -122,6 +122,65 @@ else
 endif
 
 # ------------------------------------------------------------------------------
+# install/installcheck: Filesystem-install the extension before testing
+# ------------------------------------------------------------------------------
+# Purpose: `test`/`verify-results` normally filesystem-install the extension
+#          (PGXS's `install`) before running pg_regress against it. That's
+#          wrong for "existing mode" testing, where the extension under test
+#          was deployed some other way (e.g. registered via pg_tle instead of
+#          the filesystem, or installed by a binary pg_upgrade) -- the whole
+#          point of that kind of test is to prove the other deployment path
+#          works, and a silent filesystem install as a side effect defeats it.
+#
+# Variable: PGXNTOOL_ENABLE_FS_INSTALL
+#   - Can be set manually in Makefile or command line
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: "yes" (enabled by default for all pgxntool projects)
+#   - Set to "no" to drop `install` from TEST_DEPS and stop `installcheck`
+#     from depending on `install`, so `make test`/`make installcheck`/
+#     `make verify-results` run against whatever is already installed
+#     instead of filesystem-installing first
+#
+# Implementation: See TEST_DEPS assembly and the `installcheck: install`
+# edge below (search for "PGXNTOOL_ENABLE_FS_INSTALL" in this file)
+#
+ifdef PGXNTOOL_ENABLE_FS_INSTALL
+  override PGXNTOOL_ENABLE_FS_INSTALL := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_FS_INSTALL),PGXNTOOL_ENABLE_FS_INSTALL)
+else
+  PGXNTOOL_ENABLE_FS_INSTALL = yes
+endif
+
+# ------------------------------------------------------------------------------
+# pgtap: Auto-install the pgtap dependency via `pgxn install --sudo`
+# ------------------------------------------------------------------------------
+# Purpose: `installcheck` depends on pgtap being filesystem-installed, and
+#          auto-installs it via `pgxn install pgtap --sudo` when it isn't
+#          found already. That's itself a filesystem-install side effect --
+#          the same problem PGXNTOOL_ENABLE_FS_INSTALL above solves for the
+#          extension under test -- so it needs its own way to disable, and
+#          it makes no sense to leave it on when filesystem install is
+#          otherwise turned off.
+#
+# Variable: PGXNTOOL_ENABLE_PGXN_INSTALL
+#   - Can be set manually in Makefile or command line
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: follows PGXNTOOL_ENABLE_FS_INSTALL (off automatically
+#     whenever filesystem install is off), but can be set independently --
+#     e.g. to keep PGXNTOOL_ENABLE_FS_INSTALL=yes for your own extension
+#     while still skipping the pgxn auto-install of pgtap because it's
+#     already provided some other way
+#   - Set to "no" to make `pgtap` (and the `installcheck: pgtap` edge) a
+#     complete no-op: pg_regress runs assuming pgtap is already available
+#
+# Implementation: See pgtap target definition (search for "pgtap:" in this file)
+#
+ifdef PGXNTOOL_ENABLE_PGXN_INSTALL
+  override PGXNTOOL_ENABLE_PGXN_INSTALL := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_PGXN_INSTALL),PGXNTOOL_ENABLE_PGXN_INSTALL)
+else
+  PGXNTOOL_ENABLE_PGXN_INSTALL = $(PGXNTOOL_ENABLE_FS_INSTALL)
+endif
+
+# ------------------------------------------------------------------------------
 # test/install: Run setup files before all tests in the same pg_regress session
 # ------------------------------------------------------------------------------
 # Purpose: Runs files from test/install/ before all test/sql/ files within a
@@ -323,7 +382,13 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # unordered prerequisites, so nothing stops installcheck's own prerequisite
 # chain from running before install. An explicit edge here, same as
 # check-stale-expected's, is the only ordering guarantee Make actually gives.
+#
+# Gated behind PGXNTOOL_ENABLE_FS_INSTALL (see its definition above): when
+# disabled, `installcheck` must run against whatever is already installed
+# (e.g. via pg_tle) instead of forcing a filesystem install first.
+ifeq ($(PGXNTOOL_ENABLE_FS_INSTALL),yes)
 installcheck: install
+endif
 
 #
 # TEST SUPPORT
@@ -371,7 +436,13 @@ endif
 ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_DEPS += test-build
 endif
-TEST_DEPS += install installcheck
+# install is gated behind PGXNTOOL_ENABLE_FS_INSTALL (see its definition
+# above): when disabled, `test`/`verify-results` run against whatever is
+# already installed instead of forcing a filesystem install first.
+ifeq ($(PGXNTOOL_ENABLE_FS_INSTALL),yes)
+TEST_DEPS += install
+endif
+TEST_DEPS += installcheck
 test: $(TEST_DEPS)
 	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; exit 1; fi
 
@@ -500,7 +571,17 @@ ifeq ($(PGXNTOOL_ENABLE_TEST_BUILD),yes)
 TEST_BUILD_SQL_DIR = $(TESTDIR)/build/sql
 TEST_BUILD_REGRESS = $(sort $(notdir $(basename $(TEST_BUILD_SQL_FILES))))
 .PHONY: test-build
+# Gated behind PGXNTOOL_ENABLE_FS_INSTALL (see its definition above): without
+# this, test-build would force a real filesystem install even when the rest
+# of test/installcheck was told not to, defeating the point of disabling it.
+# The prerequisite is added via its own separate rule line (no recipe of its
+# own) rather than wrapping the ifeq/endif around the recipe-bearing line
+# below -- a recipe must immediately follow its own target line, and an
+# intervening `endif` would orphan it when the condition is false.
+ifeq ($(PGXNTOOL_ENABLE_FS_INSTALL),yes)
 test-build: install
+endif
+test-build:
 	@$(PGXNTOOL_DIR)/run-test-build.sh $(TESTDIR)
 	$(MAKE) -C . REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
 	@if [ -r $(TESTDIR)/build/regression.diffs ]; then \
@@ -678,12 +759,26 @@ endif
 # $(DESTDIR)$(datadir) aren't being expanded. This can probably change after
 # the META handling stuff is it's own makefile.
 #
+#
+# This declaration is deliberately OUTSIDE the ifeq below (unlike e.g.
+# check-stale-expected's own .PHONY, which lives inside its ifeq): testdeps'
+# own `testdeps: pgtap` prerequisite (see testdeps' definition) is
+# unconditional, so pgtap must always resolve to *some* rule. Without this
+# unconditional .PHONY, disabling the block below would leave `pgtap`
+# completely undefined, and testdeps would fail with "No rule to make
+# target 'pgtap'". An empty phony rule (no prerequisites, no recipe) is
+# exactly the harmless no-op that's needed in that case.
 .PHONY: pgtap
+# Gated behind PGXNTOOL_ENABLE_PGXN_INSTALL (see its definition above): when
+# disabled, pgtap is a no-op and pg_regress runs assuming pgtap is already
+# available some other way.
+ifeq ($(PGXNTOOL_ENABLE_PGXN_INSTALL),yes)
 installcheck: pgtap
 pgtap: $(DESTDIR)$(datadir)/extension/pgtap.control
 
 $(DESTDIR)$(datadir)/extension/pgtap.control:
 	pgxn install pgtap --sudo
+endif
 
 endif # fndef PGXNTOOL_NO_PGXS_INCLUDE
 
