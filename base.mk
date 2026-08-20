@@ -129,6 +129,28 @@ endif
 #          state created by install files (tables, extensions, etc.) persists
 #          into the main test suite.
 #
+# IMPORTANT (for humans and AI agents reading this file): test/install does
+# NOT get a real pg_regress diff, unlike every other test type pgxntool
+# supports. Its schedule entries reference the original file via a relative
+# "../install/<name>" path, so pg_regress resolves BOTH the expected output
+# and the actual output to the exact same file (test/install/<name>.out) --
+# the actual run silently overwrites the expected file in place, rather than
+# ever comparing it against anything. A content difference (wrong output, a
+# changed column, whatever) will NEVER fail this way, no matter how it
+# changes -- see issue #97.
+#
+# The only thing that still fails the build is psql's own exit code: a
+# statement that raises a hard error only aborts psql (non-zero exit, which
+# pg_regress does report as a failure) if ON_ERROR_STOP is set. Without it,
+# psql prints the error, keeps going, and exits 0 -- the file "passes"
+# regardless of what happened. So it is entirely up to each
+# test/install/*.sql file to `\set ON_ERROR_STOP on` (or `\i
+# test/pgxntool/psql.sql`, which already does) if it wants failures caught
+# at all. check-test-install-error-stop below enforces this by default; see
+# PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK to disable it.
+#
+# This is intentional, documented behavior -- not a bug to be fixed quietly.
+#
 # Variable: PGXNTOOL_ENABLE_TEST_INSTALL
 #   - Can be set manually in Makefile or command line
 #   - Allowed values: "yes" or "no" (case-insensitive)
@@ -139,7 +161,10 @@ endif
 #
 # Directory layout (follows ~/code/extensions/archive/ pattern):
 #   test/install/*.sql      - Install SQL files
-#   test/install/*.out      - Expected output (lives alongside .sql files)
+#   test/install/*.out      - GENERATED, gitignored: rewritten by every run,
+#                             lives alongside .sql files but (per the
+#                             IMPORTANT note above) isn't meaningfully
+#                             compared, so there's nothing to commit
 #   test/install/schedule   - Auto-generated schedule file
 #   test/sql/schedule       - Auto-generated schedule file for regular tests
 #
@@ -164,6 +189,22 @@ else
     PGXNTOOL_ENABLE_TEST_INSTALL = no
   endif
 endif
+
+# Variable: PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK
+#   - Gates check-test-install-error-stop (see TEST_DEPS wiring below): fails
+#     the build if any test/install/*.sql file doesn't set ON_ERROR_STOP,
+#     directly or via `\i test/pgxntool/psql.sql` -- see the IMPORTANT note
+#     above for why this is the only thing standing between a hard SQL error
+#     and a silent "pass".
+#   - Allowed values: "yes" or "no" (case-insensitive)
+#   - Default: "yes"
+ifdef PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK
+  override PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK),PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK)
+else
+  PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK = yes
+endif
+
+_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-test-install-error-stop.sh
 
 # ------------------------------------------------------------------------------
 # verify-results: Safeguard for make results
@@ -361,6 +402,25 @@ check-stale-expected: installcheck
 TEST_DEPS += check-stale-expected
 endif
 
+# ------------------------------------------------------------------------------
+# check-test-install-error-stop: catch missing ON_ERROR_STOP in test/install
+# ------------------------------------------------------------------------------
+# Purpose: test/install/*.sql files never get a real pg_regress diff (see the
+# IMPORTANT note in the test/install section above) -- ON_ERROR_STOP is the
+# only thing that still turns a hard SQL error into a build failure. This is
+# a pure static scan of file contents, so unlike check-stale-expected it
+# doesn't need to run after installcheck -- it needs no ordering edge at all.
+#
+# See PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK above to disable.
+ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL),yes)
+ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK),yes)
+.PHONY: check-test-install-error-stop
+check-test-install-error-stop:
+	@$(_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT) $(TESTDIR)
+TEST_DEPS += check-test-install-error-stop
+endif
+endif
+
 # make test: run any test dependencies, then do a `make install installcheck`.
 # If regressions are found, it will output them.
 #
@@ -502,12 +562,65 @@ TEST_BUILD_REGRESS = $(sort $(notdir $(basename $(TEST_BUILD_SQL_FILES))))
 .PHONY: test-build
 test-build: install
 	@$(PGXNTOOL_DIR)/run-test-build.sh $(TESTDIR)
-	$(MAKE) -C . REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
+	$(MAKE) -C . _PGXNTOOL_TEST_BUILD_ACTIVE=yes REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
 	@if [ -r $(TESTDIR)/build/regression.diffs ]; then \
 		echo "test-build failed - see $(TESTDIR)/build/regression.diffs"; \
 		cat $(TESTDIR)/build/regression.diffs; \
 		exit 1; \
 	fi
+
+# There's no point running test/install or test/sql against a build that
+# doesn't even come up cleanly -- their results would be meaningless, so
+# test-build must run (and pass) before the main suite starts.
+#
+# Tradeoff: this also blocks the main suite on a stale/wrong
+# test/build/expected/*.out, not just a genuinely broken build -- there's
+# no `make results`-equivalent for test/build, so today that means either
+# hand-editing the expected file or using `make build-results` below.
+#
+# Guarded by _PGXNTOOL_TEST_BUILD_ACTIVE: test-build's own recipe above
+# recurses into `installcheck` to reuse PGXS's pg_regress plumbing for its
+# separate run over test/build/*.sql. Without the guard, that nested
+# installcheck would itself depend on test-build, recursing forever.
+ifneq ($(_PGXNTOOL_TEST_BUILD_ACTIVE),yes)
+installcheck: test-build
+endif
+
+# build-results: bless test/build/'s actual output as the new expected
+# output, mirroring `make results` for the main suite. Refuses to bless any
+# file whose actual output contains "ERROR:" -- accepting an errored build
+# as the new baseline would defeat the point of test-build. If a project
+# intentionally exercises an error case in test/build (e.g. verifying a
+# migration fails as expected), bless that file by hand instead:
+#   cp $(TESTDIR)/build/results/<name>.out $(TESTDIR)/build/expected/<name>.out
+#
+# This ERROR-scanning safeguard is only possible because test-build writes
+# actual output to a location genuinely separate from its expected output
+# (--inputdir/--outputdir both point at test/build, but pg_regress keeps
+# expected/ and results/ distinct there) -- test/install intentionally does
+# NOT work this way (see test/install's own comments above): its actual
+# output lands on top of its expected file, so there's nothing to diff. We
+# don't generally care about test-build's own output content, but when a
+# build genuinely errors, having a real .diff is worth the extra plumbing --
+# it points straight at the problem instead of leaving you to comb through
+# unrelated output for the one line that matters.
+.PHONY: build-results
+build-results: install
+	@$(PGXNTOOL_DIR)/run-test-build.sh $(TESTDIR)
+	$(MAKE) -C . _PGXNTOOL_TEST_BUILD_ACTIVE=yes REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
+	@mkdir -p $(TESTDIR)/build/expected
+	@skipped=0; \
+	for f in $(TESTDIR)/build/results/*.out; do \
+		[ -f "$$f" ] || continue; \
+		if grep -q 'ERROR:' "$$f"; then \
+			echo "build-results: skipping $$f (actual output contains ERROR:)" >&2; \
+			echo "  If this is intentional, bless it by hand:" >&2; \
+			echo "    cp $$f $(TESTDIR)/build/expected/$$(basename "$$f")" >&2; \
+			skipped=1; continue; \
+		fi; \
+		cp "$$f" $(TESTDIR)/build/expected/$$(basename "$$f"); \
+	done; \
+	[ "$$skipped" = 0 ] || exit 1
 endif
 
 
