@@ -32,6 +32,11 @@ test/build/sql/
 # Created by make when test/install/*.sql files exist.
 test/install/schedule
 
+# test/install/*.out is rewritten by every `make test` run and never
+# meaningfully compared against anything (see base.mk's test/install
+# comments) -- there's no reason to commit it or track changes to it.
+test/install/*.out
+
 # Misc
 tmp/
 .DS_Store

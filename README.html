@@ -507,10 +507,11 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_pgxntool_verify_results_mode">8.7. PGXNTOOL_VERIFY_RESULTS_MODE</a></li>
 <li><a href="#_pgxntool_enable_test_build">8.8. PGXNTOOL_ENABLE_TEST_BUILD *</a></li>
 <li><a href="#_pgxntool_enable_test_install">8.9. PGXNTOOL_ENABLE_TEST_INSTALL *</a></li>
-<li><a href="#_pgxntool_enable_verify_results">8.10. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
-<li><a href="#_pgxntool_enable_check_stale_expected">8.11. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></li>
-<li><a href="#_pgxntool_check_expected_file_types">8.12. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></li>
-<li><a href="#_pgxntool_no_pgxs_include">8.13. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
+<li><a href="#_pgxntool_enable_test_install_error_stop_check">8.10. PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK *</a></li>
+<li><a href="#_pgxntool_enable_verify_results">8.11. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></li>
+<li><a href="#_pgxntool_enable_check_stale_expected">8.12. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></li>
+<li><a href="#_pgxntool_check_expected_file_types">8.13. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></li>
+<li><a href="#_pgxntool_no_pgxs_include">8.14. PGXNTOOL_NO_PGXS_INCLUDE</a></li>
 </ul>
 </li>
 <li><a href="#_copyright">9. Copyright</a></li>
@@ -614,6 +615,22 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <p>Runs your extension&#8217;s test suite: installs the extension and runs it through PGXS&#8217;s <code>installcheck</code>, first pulling in anything you&#8217;ve hooked into <a href="#_testdeps">testdeps</a> and, if enabled, sanity-checking your test SQL via <a href="#_test_build">test-build</a>.</p>
 </div>
 <div class="paragraph">
+<p><code>make test</code> runs <code>pg_regress</code> in up to two separate passes:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>If <a href="#_test_build">test-build</a> is enabled, it runs first, in its own isolated pass over <code>test/build/*.sql</code>. If it fails, the second pass never happens — there&#8217;s no point checking install/query behavior against a build that doesn&#8217;t even come up cleanly.</p>
+</li>
+<li>
+<p>The main pass follows: any <a href="#_testinstall">test/install</a> files, then your regular <code>test/sql/*.sql</code> files, together in a single <code>pg_regress</code> invocation (so state the install files create persists into the regular tests).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Within each pass, files run in alphabetical order by filename.</p>
+</div>
+<div class="paragraph">
 <p>Whether <code>test-build</code> runs is controlled by the <code>PGXNTOOL_ENABLE_TEST_BUILD</code> variable — see <a href="#_test_build">test-build</a> for what it does and how to turn it on/off.</p>
 </div>
 <div class="admonitionblock note">
@@ -624,6 +641,18 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 </td>
 <td class="content">
 <code>test</code> intentionally does <strong>not</strong> depend on <code>clean</code> — that caused problems with incremental/watch-based builds. If your tests need a clean build to pass, that&#8217;s a sign of a missing dependency elsewhere rather than something to fix by adding <code>clean</code> back.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<code>test</code> exits non-zero (after printing <code>regression.diffs</code>) if any test fails. Previously it always exited 0 regardless of test results, silently masking failures from CI and other automation that relies on the exit code.
 </td>
 </tr>
 </table>
@@ -661,9 +690,21 @@ While you can still run <code>make installcheck</code> or any other valid PGXS m
 <p>These files run through <code>pg_regress</code> before <code>make test</code> runs the main test suite</p>
 </li>
 <li>
-<p>If any build test fails, the test run stops immediately with clear error messages</p>
+<p>If any build test fails, <code>make test</code> stops immediately — the main suite (test/install + test/sql) never runs, since its results would be meaningless against a broken build</p>
 </li>
 </ol>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+This also means a stale or simply wrong <code>test/build/expected/<strong>.out</code>&#8201;&#8212;&#8201;not just a genuinely broken build&#8201;&#8212;&#8201;blocks the whole suite. See <a href="#_build_results">build-results</a> below for the supported way to refresh it, including how to handle a file that&#8217;s *supposed</strong> to show an error.
+</td>
+</tr>
+</table>
 </div>
 <div class="paragraph">
 <p><strong>Directory structure:</strong></p>
@@ -749,6 +790,28 @@ ROLLBACK;</pre>
 <div class="paragraph">
 <p>When <code>CREATE EXTENSION</code> fails, PostgreSQL shows only "syntax error" with limited context. Running the SQL directly via <code>\i</code> shows the exact line and position of errors, making debugging much faster.</p>
 </div>
+<div class="sect3">
+<h4 id="_build_results"><a class="anchor" href="#_build_results"></a><a class="link" href="#_build_results">4.3.1. build-results</a></h4>
+<div class="paragraph">
+<p>Refreshes <code>test/build/expected/*.out</code> from the actual output of the last <code>test-build</code> run, mirroring <a href="#_results">results</a> for the main suite:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>make build-results</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><code>build-results</code> will <strong>not</strong> bless a file whose actual output contains an <code>ERROR:</code> line — accepting an errored build as the new expected baseline would defeat the point of test-build. It skips that file (leaving its existing expected output in place), tells you exactly which file and the command to bless it with, and exits non-zero so the skip can&#8217;t go unnoticed.</p>
+</div>
+<div class="paragraph">
+<p>If your project intentionally exercises a build-time error (e.g. asserting a migration fails the way it should), bless that file by hand instead — this is a deliberate, supported case, not a workaround, and you&#8217;ll need to repeat it by hand every time that file&#8217;s output legitimately changes, since <code>build-results</code> will always skip it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>cp test/build/results/&lt;name&gt;.out test/build/expected/&lt;name&gt;.out</pre>
+</div>
+</div>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_testinstall"><a class="anchor" href="#_testinstall"></a><a class="link" href="#_testinstall">4.4. test/install</a></h3>
@@ -762,9 +825,6 @@ ROLLBACK;</pre>
 <ol class="arabic">
 <li>
 <p>Place SQL files in <code>test/install/*.sql</code></p>
-</li>
-<li>
-<p>Place expected output alongside as <code>test/install/*.out</code></p>
 </li>
 <li>
 <p>A schedule file is auto-generated that lists install files with <code>../install/</code> relative paths</p>
@@ -781,13 +841,13 @@ ROLLBACK;</pre>
 <div class="content">
 <pre>test/install/
 ├── *.sql              # SQL setup files (checked in)
-├── *.out              # Expected output (checked in, alongside .sql)
+├── *.out              # GENERATED, gitignored -- see WARNING below
 ├── .gitignore         # Ignores pg_regress artifacts (*.out.diff)
 └── schedule           # GENERATED - auto-created by make</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>The <code>schedule</code> file is generated automatically and listed in <code>.gitignore</code>. Do not edit it.</p>
+<p>The <code>schedule</code> file is generated automatically and listed in <code>.gitignore</code>. Do not edit it. <code>*.out</code> is gitignored too, for the reason explained below — don&#8217;t commit it.</p>
 </div>
 <div class="paragraph">
 <p><strong>Configuration:</strong></p>
@@ -822,6 +882,18 @@ PGXNTOOL_ENABLE_TEST_INSTALL = yes  # or no</pre>
 </div>
 <div class="paragraph">
 <p><strong>Key detail:</strong> Install files and regular tests run in a single <code>pg_regress</code> invocation. This means the database is NOT dropped between install and test phases — state created by install files persists into the main test suite.</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Warning</div>
+</td>
+<td class="content">
+<strong><code>test/install/<strong>.out</code> is never actually compared against anything.</strong> Unlike every other test type pgxntool supports, <code>test/install&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The *only</strong> thing that still fails the build is a hard SQL error, and only if the file sets `ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
+</td>
+</tr>
+</table>
 </div>
 <div class="sect3">
 <h4 id="_update_upgrade_uu_testing"><a class="anchor" href="#_update_upgrade_uu_testing"></a><a class="link" href="#_update_upgrade_uu_testing">4.4.1. Update &amp; Upgrade (U&amp;U) Testing</a></h4>
@@ -1071,7 +1143,7 @@ If your project has a <code>.gitattributes</code> file, <code>make dist</code>/<
 <div class="sect2">
 <h3 id="_pgxntool_sync"><a class="anchor" href="#_pgxntool_sync"></a><a class="link" href="#_pgxntool_sync">4.9. pgxntool-sync</a></h3>
 <div class="paragraph">
-<p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge.</p>
+<p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge (it also verifies the <code>test/pgxntool</code> symlink, recreating it if missing).</p>
 </div>
 <div class="admonitionblock note">
 <table>
@@ -1941,13 +2013,19 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.10. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
+<h3 id="_pgxntool_enable_test_install_error_stop_check"><a class="anchor" href="#_pgxntool_enable_test_install_error_stop_check"></a><a class="link" href="#_pgxntool_enable_test_install_error_stop_check">8.10. PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK *</a></h3>
+<div class="paragraph">
+<p>Default: <code>yes</code>. Enables or disables a build-time check that every <code>test/install/*.sql</code> file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>)&#8201;&#8212;&#8201;see <a href="#_testinstall">test/install</a> for why this is the only thing that makes a hard error in one of those files actually fail the build. Set to <code>no</code> to disable the check.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_pgxntool_enable_verify_results"><a class="anchor" href="#_pgxntool_enable_verify_results"></a><a class="link" href="#_pgxntool_enable_verify_results">8.11. PGXNTOOL_ENABLE_VERIFY_RESULTS *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Enables or disables the <a href="#_verify_results_safeguard">verify-results safeguard</a> that blocks <code>make results</code> when tests are failing. Setting it to empty on the command line (<code>make PGXNTOOL_ENABLE_VERIFY_RESULTS= results</code>) also disables it.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.11. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
+<h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.12. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Enables or disables the check-stale-expected safeguard, which fails <code>make test</code> if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains a <code>.out</code> file with no corresponding <code>.sql</code> file&#8201;&#8212;&#8201;catching a stale file left behind after a test was renamed or removed. Set to <code>no</code> to make the check a complete no-op (it&#8217;s dropped from <code>TEST_DEPS</code> entirely).</p>
 </div>
@@ -1956,13 +2034,13 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.12. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
+<h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.13. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
 <div class="paragraph">
 <p>Default: <code>yes</code>. Sub-check of check-stale-expected, independent of <code>PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED</code>: fails (with a distinct error message and exit code from the orphaned-<code>.out</code> check) if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains any file that isn&#8217;t <code>*.out</code>. Set to <code>no</code> to disable just this sub-check while leaving the orphaned-<code>.out</code> check active.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.13. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
+<h3 id="_pgxntool_no_pgxs_include"><a class="anchor" href="#_pgxntool_no_pgxs_include"></a><a class="link" href="#_pgxntool_no_pgxs_include">8.14. PGXNTOOL_NO_PGXS_INCLUDE</a></h3>
 <div class="paragraph">
 <p>Default: unset (PGXS is included normally). Skips including PGXS (<code>$(PGXS)</code>) entirely. This is only for advanced scenarios where you need to manage the PGXS include yourself; most projects should never set this.</p>
 </div>
@@ -1983,7 +2061,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-31 16:13:06 -0500
+Last updated 2026-08-20 18:23:39 -0500
 </div>
 </div>
 </body>
