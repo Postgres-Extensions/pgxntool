@@ -100,7 +100,10 @@ jobs:
 
       - name: Run Claude Code Review
         if: steps.gate.outputs.decision == 'run'
-        uses: anthropics/claude-code-action@v1
+        # Pinned to an immutable SHA: this job runs as pull_request_target with
+        # pull-requests: write, so a moved upstream tag must not change what
+        # runs -- same rationale as github-script's pin in ci.yml/protect-label.yml.
+        uses: anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Provide github_token so the action uses it directly for GitHub API
