@@ -93,7 +93,7 @@ jobs:
         # No `repository:`/`ref:` here on purpose — this checks out the base
         # branch (master), never the fork's PR head. See the SECURITY note
         # above.
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
           persist-credentials: false

@@ -32,7 +32,7 @@ jobs:
       - name: Find paired pgxntool-test PR or check commit-with-no-tests label
         id: check
         # Pinned to an immutable SHA (supply-chain hardening); comment tracks the tag.
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           # GITHUB_TOKEN is sufficient for reading public repos. If these repos
           # are ever made private, replace with a PAT stored as a secret with
