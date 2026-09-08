@@ -149,6 +149,20 @@ endif
 # at all. check-test-install-error-stop below enforces this by default; see
 # PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK to disable it.
 #
+# Why not just force `-v ON_ERROR_STOP=1` onto the psql invocation instead of
+# checking each file? Because there isn't one to force it onto: test/install
+# and test/sql run inside the same pg_regress invocation, and pg_regress's
+# psql command line (`-X -a -q -d db -v HIDE_TABLEAM=on ...`, see
+# src/test/regress/pg_regress_main.c) is hardcoded into the binary, with no
+# `--variable`-style passthrough and no PSQLRC (-X disables it). The only
+# extension point, --launcher=CMD, wraps the whole command rather than adding
+# flags to it. Even a launcher hack that did inject the flag would be the
+# wrong tool here: it would apply to test/sql too, breaking any test file
+# that deliberately triggers an error mid-file and keeps going to check what
+# happens next -- a normal pg_regress pattern. The per-file opt-in is what
+# lets ON_ERROR_STOP apply to test/install without changing test/sql
+# semantics.
+#
 # This is intentional, documented behavior -- not a bug to be fixed quietly.
 #
 # Variable: PGXNTOOL_ENABLE_TEST_INSTALL
