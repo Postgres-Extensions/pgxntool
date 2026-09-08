@@ -30,6 +30,16 @@ development must be done from the **pgxntool-test** repository, not from here. S
 Any agent working in an extension project should always defer to that project's own
 CLAUDE.md and instructions over anything stated here.
 
+Guidance that is about PostgreSQL itself rather than about pgxntool lives in
+`CLAUDE-POSTGRES.md` instead, so that this file stays about pgxntool.
+
+## Read `CLAUDE-POSTGRES.md`
+
+**`CLAUDE-POSTGRES.md` (next to this file) contains rules you must follow.** The `@` line
+below imports it where that is supported; read the file directly if it did not.
+
+@CLAUDE-POSTGRES.md
+
 ## Git Commit Guidelines
 
 **IMPORTANT**: When creating commit messages, do not attribute commits to yourself (Claude). Commit messages should reflect the work being done without AI attribution in the message body. The standard Co-Authored-By trailer is acceptable.
@@ -289,4 +299,3 @@ may lack such a header.
 ## Related Repositories
 
 - **pgxntool-test** - Test harness for validating pgxntool functionality: https://github.com/Postgres-Extensions/pgxntool-test
-- Never produce any kind of metrics or estimates unless you have data to back them up. If you do have data you MUST reference it.
