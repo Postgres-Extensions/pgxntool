@@ -4,8 +4,8 @@
 # this, every target in the file gets redefined, producing
 # overriding-recipe/ignoring-old-recipe warnings. A second inclusion is a
 # harmless no-op.
-ifndef PGXNTOOL_BASE_MK_INCLUDED
-PGXNTOOL_BASE_MK_INCLUDED := 1
+ifndef _PGXNTOOL_BASE_MK_INCLUDED
+_PGXNTOOL_BASE_MK_INCLUDED := 1
 
 PGXNTOOL_DIR := pgxntool
 
@@ -39,10 +39,10 @@ meta.mk: META.json Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/meta.mk.sh
 # These can differ, and PostgreSQL cares about the control file version.
 #
 # Find all control files first (needed for dependencies)
-PGXNTOOL_CONTROL_FILES := $(wildcard *.control)
+_PGXNTOOL_CONTROL_FILES := $(wildcard *.control)
 PGXNTOOL_distclean += control.mk
-control.mk: $(PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/control.mk.sh
-	@$(PGXNTOOL_DIR)/control.mk.sh $(PGXNTOOL_CONTROL_FILES) >$@
+control.mk: $(_PGXNTOOL_CONTROL_FILES) Makefile $(PGXNTOOL_DIR)/base.mk $(PGXNTOOL_DIR)/control.mk.sh
+	@$(PGXNTOOL_DIR)/control.mk.sh $(_PGXNTOOL_CONTROL_FILES) >$@
 
 -include control.mk
 
@@ -264,7 +264,7 @@ PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
 #   - Passed through to check-stale-expected.sh; see that script for the
 #     distinct error message/exit code this sub-check uses
 #
-# Variable: _CHECK_STALE_EXPECTED_SCRIPT (internal shim, not user-facing)
+# Variable: _PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT (internal shim, not user-facing)
 #   - Path to the script the check-stale-expected target invokes
 #   - Default: $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
 #
@@ -283,7 +283,7 @@ else
   PGXNTOOL_CHECK_EXPECTED_FILE_TYPES = yes
 endif
 
-_CHECK_STALE_EXPECTED_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
+_PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
 
 # Generate unique database name for tests to prevent conflicts across projects
 # Uses project name + first 5 chars of md5 hash of current directory
@@ -334,21 +334,21 @@ endif
 # install files in their original location without copying.
 #
 ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL),yes)
-PGXNTOOL_INSTALL_SCHEDULE = $(TESTDIR)/install/schedule
-EXTRA_CLEAN += $(PGXNTOOL_INSTALL_SCHEDULE)
+_PGXNTOOL_INSTALL_SCHEDULE = $(TESTDIR)/install/schedule
+EXTRA_CLEAN += $(_PGXNTOOL_INSTALL_SCHEDULE)
 
 # Add install schedule; REGRESS stays as-is (regular tests run after schedule)
-REGRESS_OPTS += --schedule=$(PGXNTOOL_INSTALL_SCHEDULE)
+REGRESS_OPTS += --schedule=$(_PGXNTOOL_INSTALL_SCHEDULE)
 
 # Always regenerate schedule file to catch added/removed files
-.PHONY: $(PGXNTOOL_INSTALL_SCHEDULE)
-$(PGXNTOOL_INSTALL_SCHEDULE):
+.PHONY: $(_PGXNTOOL_INSTALL_SCHEDULE)
+$(_PGXNTOOL_INSTALL_SCHEDULE):
 	@echo "# Auto-generated - DO NOT EDIT" > $@
 	@for f in $(notdir $(basename $(TEST_INSTALL_SQL_FILES))); do \
 		echo "test: ../install/$$f" >> $@; \
 	done
 
-installcheck: $(PGXNTOOL_INSTALL_SCHEDULE)
+installcheck: $(_PGXNTOOL_INSTALL_SCHEDULE)
 endif
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -403,7 +403,7 @@ TEST_DEPS = testdeps
 ifeq ($(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),yes)
 .PHONY: check-stale-expected
 check-stale-expected: installcheck
-	@$(_CHECK_STALE_EXPECTED_SCRIPT) $(TESTDIR) $(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
+	@$(_PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT) $(TESTDIR) $(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
 TEST_DEPS += check-stale-expected
 endif
 
@@ -498,8 +498,8 @@ testdeps: pgtap
 # pg_tle support - Generate pg_tle registration SQL
 #
 
-# PGXNTOOL_CONTROL_FILES is defined above (for control.mk dependencies)
-PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
+# _PGXNTOOL_CONTROL_FILES is defined above (for control.mk dependencies)
+_PGXNTOOL_EXTENSIONS = $(basename $(_PGXNTOOL_CONTROL_FILES))
 
 # Main target
 # Depend on 'all' to ensure versioned SQL files are generated first
@@ -512,8 +512,8 @@ PGXNTOOL_EXTENSIONS = $(basename $(PGXNTOOL_CONTROL_FILES))
 # "which pg_tle to test against" env var (see issue #78) -- that collided
 # with this variable silently instead of erroring.
 .PHONY: pgtle
-pgtle: all control.mk $(PGXNTOOL_CONTROL_FILES)
-	@$(foreach ext,$(PGXNTOOL_EXTENSIONS),\
+pgtle: all control.mk $(_PGXNTOOL_CONTROL_FILES)
+	@$(foreach ext,$(_PGXNTOOL_EXTENSIONS),\
 		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext) $(if $(PGXNTOOL_PGTLE_VERSION),--pgtle-version $(PGXNTOOL_PGTLE_VERSION));)
 
 #
@@ -543,6 +543,42 @@ check-pgtle:
 .PHONY: run-pgtle
 run-pgtle: pgtle
 	@$(PGXNTOOL_DIR)/pgtle.sh --run
+
+# Print generated pg_tle registration SQL to stdout, for consumers building
+# a combined multi-extension install file, e.g.:
+#   $(MAKE) --no-print-directory -C ../deps/cat_tools print-pgtle >> pgtle-all.sql
+# --no-print-directory is required: GNU Make auto-prints "Entering
+# directory"/"Leaving directory" to stdout for recursive invocations like
+# this one, which would otherwise corrupt the redirected file.
+# Depends on 'pgtle' so the SQL files are (re)generated first.
+# Selects the directory via PGXNTOOL_PGTLE_TARGET_VERSION if set (an actual
+# pg_tle version like 1.5.2, not a range), otherwise via the installed
+# version (pgtle.sh --get-version). Deliberately not named PGTLE_VERSION or
+# reusing PGXNTOOL_PGTLE_VERSION: a CI job's PGTLE_VERSION env var means
+# "which pg_tle to test against," a concept that can legitimately diverge
+# from "which version this printed artifact should target" -- collapsing
+# them would silently produce a plausible-but-wrong artifact on divergence.
+# PGXNTOOL_PGTLE_VERSION itself holds a range (e.g. 1.5.0+), not an exact
+# version, so it can't be reused here either.
+.PHONY: print-pgtle
+print-pgtle: pgtle
+	@version="$(PGXNTOOL_PGTLE_TARGET_VERSION)"; \
+	if [ -z "$$version" ]; then \
+		version=$$($(PGXNTOOL_DIR)/pgtle.sh --get-version 2>/dev/null); \
+		if [ -z "$$version" ]; then \
+			echo "ERROR: pg_tle version not specified and pg_tle is not installed" >&2; \
+			echo "       Set PGXNTOOL_PGTLE_TARGET_VERSION=X.Y.Z, or run 'CREATE EXTENSION pg_tle;' first" >&2; \
+			exit 1; \
+		fi; \
+	fi; \
+	pgtle_dir=$$($(PGXNTOOL_DIR)/pgtle.sh --get-dir "$$version") || exit 1; \
+	$(foreach ext,$(_PGXNTOOL_EXTENSIONS),\
+		f="$$pgtle_dir/$(ext).sql"; \
+		if [ ! -f "$$f" ]; then \
+			echo "ERROR: $$f does not exist (run 'make pgtle' first)" >&2; \
+			exit 1; \
+		fi; \
+		cat "$$f";)
 
 # These targets ensure all the relevant directories exist
 $(TESTDIR)/sql $(TESTDIR)/expected/ $(TESTOUT)/results/:
@@ -810,4 +846,4 @@ $(DESTDIR)$(datadir)/extension/pgtap.control:
 
 endif # fndef PGXNTOOL_NO_PGXS_INCLUDE
 
-endif # ifndef PGXNTOOL_BASE_MK_INCLUDED
+endif # ifndef _PGXNTOOL_BASE_MK_INCLUDED
