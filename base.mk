@@ -610,14 +610,14 @@ endif
 # it points straight at the problem instead of leaving you to comb through
 # unrelated output for the one line that matters.
 #
-# Can't just depend on test-build itself: its recipe exits 1 on any
-# regression.diffs, which is exactly the diff build-results exists to
-# accept as the new baseline. So build-results re-runs the same
-# run-test-build.sh + installcheck steps directly, without that check.
+# Runs test-build itself (leading `-` ignores its exit status) instead of
+# duplicating its run-test-build.sh + installcheck steps: by the time
+# test-build's own regression.diffs check fails, the actual output
+# build-results needs is already on disk -- the failure just means "there's
+# a diff", which is exactly what build-results exists to bless.
 .PHONY: build-results
-build-results: install
-	@$(PGXNTOOL_DIR)/run-test-build.sh $(TESTDIR)
-	$(MAKE) -C . _PGXNTOOL_TEST_BUILD_ACTIVE=yes REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
+build-results:
+	-$(MAKE) -C . test-build
 	@mkdir -p $(TESTDIR)/build/expected
 	@skipped=0; \
 	for f in $(TESTDIR)/build/results/*.out; do \
