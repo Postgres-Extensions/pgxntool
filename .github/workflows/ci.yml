@@ -342,7 +342,11 @@ jobs:
 
   test:
     needs: check-test-pr
-    if: needs.check-test-pr.outputs.run-tests == 'true'
+    # !cancelled() (not bare always()): check-test-pr's own failure paths are
+    # exactly the cases that still need a real test run (see its script), so
+    # this must run despite check-test-pr's conclusion -- but an actual
+    # workflow cancellation should still skip it.
+    if: ${{ !cancelled() && needs.check-test-pr.outputs.run-tests == 'true' }}
     # -----------------------------------------------------------------------
     # CROSS-REPO REUSABLE WORKFLOW — READ BEFORE CHANGING THIS REF
     # See: .github/workflows/CLAUDE.md for full architecture notes.
