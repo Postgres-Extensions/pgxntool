@@ -26,7 +26,8 @@ jobs:
     timeout-minutes: 25
     outputs:
       run-tests: ${{ steps.check.outputs.run_tests }}
-      test-ref: ${{ steps.check.outputs.test_ref }}
+      pgxntool-test-owner: ${{ steps.check.outputs.pgxntool_test_owner }}
+      pgxntool-test-ref: ${{ steps.check.outputs.pgxntool_test_ref }}
 
     steps:
       - name: Find paired pgxntool-test PR or check commit-with-no-tests label
@@ -86,7 +87,8 @@ jobs:
                 `paired-test-PR requirement and the Postgres test matrix.`
               );
               core.setOutput('run_tests', 'false');
-              core.setOutput('test_ref', '');
+              core.setOutput('pgxntool_test_owner', '');
+              core.setOutput('pgxntool_test_ref', '');
               return;
             }
 
@@ -115,7 +117,8 @@ jobs:
                 );
               }
               core.setOutput('run_tests', 'true');
-              core.setOutput('test_ref', 'master');
+              core.setOutput('pgxntool_test_owner', 'Postgres-Extensions');
+              core.setOutput('pgxntool_test_ref', 'master');
               return;
             }
 
@@ -145,6 +148,12 @@ jobs:
               pr.head.repo?.owner?.login === prOwner
             );
             if (matching.length > 1) {
+              // Can't tell which paired branch is the real one, but a real
+              // signal still matters more than none -- fall back to a test
+              // run against pgxntool-test/master while enforcement fails.
+              core.setOutput('run_tests', 'true');
+              core.setOutput('pgxntool_test_owner', 'Postgres-Extensions');
+              core.setOutput('pgxntool_test_ref', 'master');
               core.setFailed(
                 `Multiple open pgxntool-test PRs from ${prOwner} match branch ` +
                 `'${branch}'. Cannot determine which one to use.\n\n` +
@@ -165,6 +174,11 @@ jobs:
                 pull_number: prNumber
               });
               if (currentPR.labels.some(l => l.name === NO_TEST_LABEL)) {
+                // Contradictory state, but a paired branch to test against is
+                // right there -- use it for a real signal while enforcement fails.
+                core.setOutput('run_tests', 'true');
+                core.setOutput('pgxntool_test_owner', testPR.head.repo.owner.login);
+                core.setOutput('pgxntool_test_ref', testPR.head.ref);
                 core.setFailed(
                   `PR has the '${NO_TEST_LABEL}' label, but a paired ` +
                   `pgxntool-test PR #${testPR.number} exists on branch '${branch}'.\n\n` +
@@ -215,6 +229,12 @@ jobs:
                 const elapsed = Date.now() - waitStart;
                 if (elapsed >= MAX_WAIT_MS) {
                   const mins = Math.round(elapsed / 60000);
+                  // Timed out waiting for the paired PR's own CI, but its
+                  // branch is known -- use it for a real signal while
+                  // enforcement fails, rather than leaving zero signal.
+                  core.setOutput('run_tests', 'true');
+                  core.setOutput('pgxntool_test_owner', testPR.head.repo.owner.login);
+                  core.setOutput('pgxntool_test_ref', testPR.head.ref);
                   if (runs.length === 0) {
                     core.setFailed(
                       `pgxntool-test PR #${testPR.number} has no CI runs for ` +
@@ -266,7 +286,8 @@ jobs:
                 `SHA ${sha.slice(0, 7)} — tests run there, not here.`
               );
               core.setOutput('run_tests', 'false');
-              core.setOutput('test_ref', sha);
+              core.setOutput('pgxntool_test_owner', '');
+              core.setOutput('pgxntool_test_ref', '');
               return;
             }
 
@@ -295,6 +316,12 @@ jobs:
             }
 
             // Neither a paired test PR nor the override label was found.
+            // Give the maintainer a real test signal to decide whether to
+            // override this failure, by running against pgxntool-test/master
+            // before failing below.
+            core.setOutput('run_tests', 'true');
+            core.setOutput('pgxntool_test_owner', 'Postgres-Extensions');
+            core.setOutput('pgxntool_test_ref', 'master');
             // Fail with a clear, actionable message.
             core.setFailed(
               `No paired pgxntool-test PR found for branch '${branch}', ` +
@@ -314,7 +341,9 @@ jobs:
 
   test:
     needs: check-test-pr
-    if: needs.check-test-pr.outputs.run-tests == 'true'
+    # Runs even when check-test-pr fails (its run-tests output can still be
+    # true); !cancelled() skips only on a real cancellation, unlike always().
+    if: ${{ !cancelled() && needs.check-test-pr.outputs.run-tests == 'true' }}
     # -----------------------------------------------------------------------
     # CROSS-REPO REUSABLE WORKFLOW — READ BEFORE CHANGING THIS REF
     # See: .github/workflows/CLAUDE.md for full architecture notes.
@@ -330,7 +359,9 @@ jobs:
       # pgxntool: this PR's own branch, on its own account (a fork for fork PRs).
       pgxntool-owner: ${{ github.event.pull_request.head.repo.owner.login }}
       pgxntool-branch: ${{ github.event.pull_request.head.ref }}
-      # pgxntool-test: no paired test PR in this path, so use canonical master
-      # from Postgres-Extensions only (never a fork's master).
-      pgxntool-test-owner: Postgres-Extensions
-      pgxntool-test-ref: master
+
+      # pgxntool-test: whichever owner/ref check-test-pr decided gives a real
+      # signal for this path (the paired PR's own branch when one exists and
+      # is usable, canonical master otherwise -- see check-test-pr's script).
+      pgxntool-test-owner: ${{ needs.check-test-pr.outputs.pgxntool-test-owner }}
+      pgxntool-test-ref: ${{ needs.check-test-pr.outputs.pgxntool-test-ref }}
