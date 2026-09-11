@@ -316,10 +316,9 @@ jobs:
             }
 
             // Neither a paired test PR nor the override label was found.
-            // Enforcement below is unchanged (this PR still fails the
-            // check), but that's not a reason to leave the maintainer with
-            // zero test signal while deciding whether to override it --
-            // run against pgxntool-test/master anyway.
+            // Give the maintainer a real test signal to decide whether to
+            // override this failure, by running against pgxntool-test/master
+            // before failing below.
             core.setOutput('run_tests', 'true');
             core.setOutput('pgxntool_test_owner', 'Postgres-Extensions');
             core.setOutput('pgxntool_test_ref', 'master');
@@ -362,6 +361,7 @@ jobs:
       # pgxntool: this PR's own branch, on its own account (a fork for fork PRs).
       pgxntool-owner: ${{ github.event.pull_request.head.repo.owner.login }}
       pgxntool-branch: ${{ github.event.pull_request.head.ref }}
+
       # pgxntool-test: whichever owner/ref check-test-pr decided gives a real
       # signal for this path (the paired PR's own branch when one exists and
       # is usable, canonical master otherwise -- see check-test-pr's script).
