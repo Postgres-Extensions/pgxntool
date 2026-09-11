@@ -341,10 +341,8 @@ jobs:
 
   test:
     needs: check-test-pr
-    # !cancelled() (not bare always()): check-test-pr's own failure paths are
-    # exactly the cases that still need a real test run (see its script), so
-    # this must run despite check-test-pr's conclusion -- but an actual
-    # workflow cancellation should still skip it.
+    # Runs even when check-test-pr fails (its run-tests output can still be
+    # true); !cancelled() skips only on a real cancellation, unlike always().
     if: ${{ !cancelled() && needs.check-test-pr.outputs.run-tests == 'true' }}
     # -----------------------------------------------------------------------
     # CROSS-REPO REUSABLE WORKFLOW — READ BEFORE CHANGING THIS REF
