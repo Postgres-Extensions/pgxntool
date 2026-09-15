@@ -57,9 +57,10 @@ if [ -s "$diffs" ]; then
 	# or '-'. A block whose hunks all read "@@ -0,0 +N,M @@" was diffed
 	# against an empty expected file, i.e. that placeholder.
 	classified=$(awk '
-		function flush() {
+		function flush(   status) {
 			if (results == "") return
-			print (hunks > 0 && unblessed ? "unblessed" : "regression") "\t" results
+			status = (hunks > 0 && unblessed) ? "unblessed" : "regression"
+			print status "\t" results
 		}
 		/^diff / { flush(); results = $NF; unblessed = 1; hunks = 0; next }
 		/^@@ /   { hunks++; if ($0 !~ /^@@ -0,0 /) unblessed = 0; next }
