@@ -1000,16 +1000,19 @@ It will probably cause problems if you try to create a <code>testdeps</code> rul
 <dl>
 <dt class="hdlist1"><code>pgtap</code> (the default)</dt>
 <dd>
-<p>Scans <code>test/results/*.out</code> for pgTAP <code>not ok</code> lines (ignoring <code># TODO</code> items) and plan-count mismatches, then also checks <code>test/results/regression.diffs</code> for any output mismatch pgTAP itself wouldn&#8217;t catch.</p>
+<p>Scans <code>test/results/*.out</code> for pgTAP <code>not ok</code> lines (ignoring <code># TODO</code> items) and plan-count mismatches, then also checks <code>test/regression.diffs</code> for any output mismatch pgTAP itself wouldn&#8217;t catch. A test that has no expected output file yet is the one exception: it always shows up in <code>regression.diffs</code> (pgxntool creates an empty expected file for it, because <code>pg_regress</code> aborts on a missing one), so <code>make results</code> is allowed to create its first expected output — provided its own pgTAP output is clean and free of SQL errors. If a new test legitimately needs output containing a SQL error blessed, use <code>PGXNTOOL_ENABLE_VERIFY_RESULTS=no</code> for that one run.</p>
 </dd>
 <dt class="hdlist1"><code>diffs</code></dt>
 <dd>
-<p>Only checks whether <code>test/results/regression.diffs</code> exists.</p>
+<p>Only checks whether <code>test/regression.diffs</code> exists, so it can&#8217;t create a new test&#8217;s first expected output; use <code>pgtap</code> mode, or <code>PGXNTOOL_ENABLE_VERIFY_RESULTS=no</code> for that one run.</p>
 </dd>
 </dl>
 </div>
 <div class="paragraph">
 <p>If tests are failing, <code>make results</code> prints an explanation of what failed and exits without touching <code>test/expected/</code>; fix the failures, then re-run <code>make results</code>.</p>
+</div>
+<div class="paragraph">
+<p>It also refuses when <code>pg_regress</code> didn&#8217;t finish at all — an unreachable server, an interrupt — since <code>test/results/</code> then still holds an earlier run&#8217;s output and blessing it would make that stale output the new expected results.</p>
 </div>
 <div class="paragraph">
 <p>To select a mode explicitly:</p>
@@ -1980,7 +1983,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect3">
 <h4 id="_pgtap"><a class="anchor" href="#_pgtap"></a><a class="link" href="#_pgtap">8.8.1. pgtap</a></h4>
 <div class="paragraph">
-<p>Scans <code>test/results/*.out</code> for pgTap <code>not ok</code> lines and plan mismatches, falling back to checking for <code>regression.diffs</code> too. Use this mode when your test suite uses pgTap.</p>
+<p>Scans <code>test/results/*.out</code> for pgTap <code>not ok</code> lines and plan mismatches, falling back to checking <code>regression.diffs</code> too — except for a test that has no expected output yet, whose first expected file <code>make results</code> is allowed to create. Use this mode when your test suite uses pgTap.</p>
 </div>
 </div>
 <div class="sect3">
@@ -2068,7 +2071,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-09-08 16:14:24 -0500
+Last updated 2026-09-15 17:56:12 -0500
 </div>
 </div>
 </body>
