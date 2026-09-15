@@ -704,7 +704,7 @@ While you can still run <code>make installcheck</code> or any other valid PGXS m
 <div class="title">Note</div>
 </td>
 <td class="content">
-This also means a stale or simply wrong <code>test/build/expected/<strong>.out</code>&#8201;&#8212;&#8201;not just a genuinely broken build&#8201;&#8212;&#8201;blocks the whole suite. See <a href="#_build_results">build-results</a> below for the supported way to refresh it, including how to handle a file that&#8217;s *supposed</strong> to show an error.
+This also means a stale or simply wrong <code>test/build/expected/*.out</code>&#8201;&#8212;&#8201;not just a genuinely broken build&#8201;&#8212;&#8201;blocks the whole suite. See <a href="#_build_results">build-results</a> below for the supported way to refresh it, including how to handle a file that&#8217;s <strong>supposed</strong> to show an error.
 </td>
 </tr>
 </table>
@@ -893,7 +893,7 @@ PGXNTOOL_ENABLE_TEST_INSTALL = yes  # or no</pre>
 <div class="title">Warning</div>
 </td>
 <td class="content">
-<strong><code>test/install/<strong>.out</code> is never actually compared against anything.</strong> Unlike every other test type pgxntool supports, <code>test/install&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The *only</strong> thing that still fails the build is a hard SQL error, and only if the file sets `ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
+<strong><code>test/install/*.out</code> is never actually compared against anything.</strong> Unlike every other test type pgxntool supports, the <code>test/install</code> directory&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The <strong>only</strong> thing that still fails the build is a hard SQL error, and only if the file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
 </td>
 </tr>
 </table>
@@ -2117,7 +2117,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-09-08 18:45:31 -0500
+Last updated 2026-09-15 17:10:08 -0500
 </div>
 </div>
 </body>
