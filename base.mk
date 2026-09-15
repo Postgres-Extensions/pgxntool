@@ -146,12 +146,19 @@ endif
 # The schedule files use relative paths (../install/testname) so pg_regress
 # resolves install files from their original location without copying.
 #
+# Ordering guarantee: install files run in plain byte-value (ASCII) order of
+# their filenames, via $(sort). This is GNU Make's own sort, not the shell's
+# `sort` -- it's unaffected by locale (LC_COLLATE etc.), so it's the same on
+# every machine regardless of environment. If one install file depends on
+# another having already run, encode that dependency in the filenames
+# themselves (e.g. a numeric prefix: 01_roles.sql before 02_extension.sql).
+#
 # NOTE: The variable normalization pattern below (ifdef/NORM/error/override) is
 # identical to test-build and verify-results. Refactoring options:
 #   1. A $(call normalize_bool_var,VAR,DEFAULT) Make function
 #   2. A small include fragment (e.g. pgxntool/mk/bool-var.mk)
 # Either approach would eliminate the ~10-line block repeated for each feature.
-TEST_INSTALL_SQL_FILES = $(wildcard $(TESTDIR)/install/*.sql)
+TEST_INSTALL_SQL_FILES = $(sort $(wildcard $(TESTDIR)/install/*.sql))
 ifdef PGXNTOOL_ENABLE_TEST_INSTALL
   # override needed so command-line values (make VAR=YES) are normalized, not silently ignored.
   # := needed for immediate evaluation of the function call (avoids infinite recursion with =).

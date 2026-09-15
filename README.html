@@ -635,6 +635,18 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <div class="title">Note</div>
 </td>
 <td class="content">
+<code>test</code> exits non-zero (after printing <code>regression.diffs</code>) if any test fails. Previously it always exited 0 regardless of test results, silently masking failures from CI and other automation that relies on the exit code.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
 While you can still run <code>make installcheck</code> or any other valid PGXS make target directly, it&#8217;s recommended to use <code>make test</code> when using pgxntool. The <code>test</code> target ensures proper test isolation and correct dependency installation.
 </td>
 </tr>
@@ -788,6 +800,9 @@ ROLLBACK;</pre>
 </div>
 <div class="paragraph">
 <p>The <code>schedule</code> file is generated automatically and listed in <code>.gitignore</code>. Do not edit it.</p>
+</div>
+<div class="paragraph">
+<p><strong>Ordering:</strong> Install files run in plain byte-value (ASCII) order of their filenames, guaranteed regardless of filesystem or locale. If one install file depends on another having already run, encode that dependency in the filenames themselves (e.g. <code>01_roles.sql</code> before <code>02_extension.sql</code>).</p>
 </div>
 <div class="paragraph">
 <p><strong>Configuration:</strong></p>
@@ -1071,7 +1086,7 @@ If your project has a <code>.gitattributes</code> file, <code>make dist</code>/<
 <div class="sect2">
 <h3 id="_pgxntool_sync"><a class="anchor" href="#_pgxntool_sync"></a><a class="link" href="#_pgxntool_sync">4.9. pgxntool-sync</a></h3>
 <div class="paragraph">
-<p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge.</p>
+<p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge (it also verifies the <code>test/pgxntool</code> symlink, recreating it if missing).</p>
 </div>
 <div class="admonitionblock note">
 <table>
@@ -1983,7 +1998,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-07-31 16:13:06 -0500
+Last updated 2026-09-15 17:18:43 -0500
 </div>
 </div>
 </body>
