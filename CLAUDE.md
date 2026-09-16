@@ -30,6 +30,16 @@ development must be done from the **pgxntool-test** repository, not from here. S
 Any agent working in an extension project should always defer to that project's own
 CLAUDE.md and instructions over anything stated here.
 
+Guidance that is about PostgreSQL itself rather than about pgxntool lives in
+`CLAUDE-POSTGRES.md` instead, so that this file stays about pgxntool.
+
+## Read `CLAUDE-POSTGRES.md`
+
+**`CLAUDE-POSTGRES.md` (next to this file) contains rules you must follow.** The `@` line
+below imports it where that is supported; read the file directly if it did not.
+
+@CLAUDE-POSTGRES.md
+
 ## Git Commit Guidelines
 
 **IMPORTANT**: When creating commit messages, do not attribute commits to yourself (Claude). Commit messages should reflect the work being done without AI attribution in the message body. The standard Co-Authored-By trailer is acceptable.
@@ -171,9 +181,9 @@ Note: `make test` intentionally does *not* depend on `clean` — depending on `c
 
 **Database Connection Requirement**: PostgreSQL must be running before executing `make test`. If you get connection errors (e.g., "could not connect to server"), stop and ask the user to start PostgreSQL.
 
-**Claude Code MUST NEVER run `make results`**. This target updates test expected output files and requires manual human verification of test changes before execution.
+**Claude Code MUST NEVER run `make results` or `make build-results`**. Both update test expected output files and require manual human verification of test changes before execution.
 
-**Claude Code MUST NEVER modify files in `test/expected/`**. These are expected test outputs that define correct behavior and must only be updated through the `make results` workflow.
+**Claude Code MUST NEVER modify files in `test/expected/` or `test/build/expected/`**. These are expected test outputs that define correct behavior and must only be updated through the `make results`/`make build-results` workflows.
 
 The workflow is:
 1. Human runs `make test` and examines diffs
@@ -189,6 +199,11 @@ pgxntool uses PostgreSQL's pg_regress test framework:
 - **Updating expectations**: `make results` copies `test/results/` → `test/expected/`
 
 When tests fail, examine the diff output carefully. The actual test output in `test/results/` shows what your code produced, while `test/expected/` shows what was expected.
+
+**Exceptions to the above** -- `test-build` and `test/install` (both optional, see `README.asc`) don't follow the `test/results` vs `test/expected` model:
+
+- **test-build** runs first, in its own separate `pg_regress` pass over `test/build/*.sql`, and gates the main suite: if it fails, `test/install`/`test/sql` never run at all. It does compare actual vs expected normally (`test/build/results/` vs `test/build/expected/`) -- use `make build-results` to refresh its expected output, not `make results`.
+- **test/install** does NOT get a real diff at all: its actual output is written to the exact same file as its expected output, so a content difference can never fail the build, no matter what changed. The only thing that still fails the build is a hard SQL error, and only if the file has `ON_ERROR_STOP` set (directly or via `\i test/pgxntool/psql.sql`) -- pgxntool checks for this by default. If a `test/install/*.sql` file is misbehaving, don't go looking for a diff; check whether it errored, and don't assume a stale-looking `.out` for it means anything.
 
 ## Key Implementation Details
 
@@ -289,4 +304,3 @@ may lack such a header.
 ## Related Repositories
 
 - **pgxntool-test** - Test harness for validating pgxntool functionality: https://github.com/Postgres-Extensions/pgxntool-test
-- Never produce any kind of metrics or estimates unless you have data to back them up. If you do have data you MUST reference it.
