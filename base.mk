@@ -885,7 +885,7 @@ ifeq ($(PGXNTOOL_ENABLE_POST_TAG_VERSION_BUMP),yes)
 .PHONY: post-tag-version-bump
 post-tag-version-bump:
 	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes! Commit or stash before bumping default_version.'; echo; git status; exit 1)
-	$(_POST_TAG_VERSION_BUMP_SCRIPT) $(PGXNTOOL_POST_TAG_VERSION) $(PGXNTOOL_CONTROL_FILES)
+	$(_POST_TAG_VERSION_BUMP_SCRIPT) $(PGXNTOOL_POST_TAG_VERSION) $(_PGXNTOOL_CONTROL_FILES)
 else
 .PHONY: post-tag-version-bump
 post-tag-version-bump:
