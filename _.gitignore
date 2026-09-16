@@ -19,6 +19,10 @@ control.mk
 # built targets
 # Note: Version-specific files (sql/*--*.sql) are now tracked in git and should be committed
 
+# Post-tag placeholder version's generated SQL file (see PGXNTOOL_POST_TAG_VERSION
+# in README.asc's "tag" section). Update this line if you override that variable.
+sql/*--stable.sql
+
 # Test artifacts
 results/
 regression.diffs
