@@ -664,6 +664,35 @@ all: html
 
 endif # ASCIIDOC
 
+#
+# Warn when DOCS lists the same file twice. `install` refuses to overwrite a
+# file it just installed ("will not overwrite just-created"), so a single
+# duplicated entry fails the whole install.
+#
+# The dedup above covers base.mk's own committed-vs-generated .html overlap,
+# but an extension's own `DOCS +=` can collide with the doc/* wildcard just as
+# easily, which is what this catches.
+#
+# This has to be a recipe rather than a parse-time $(warning): an extension's
+# Makefile appends to DOCS *after* it includes base.mk, so nothing evaluated
+# while base.mk is being read can see the final list. Make expands a recipe
+# just before running it, by which point every makefile has been read, so
+# $(warning) here reports the fully-assembled value. It hangs off `all` rather
+# than `install` because PGXS's `install` depends on `all` -- so this still
+# runs before anything is installed -- while `all` is also the default goal,
+# making a plain `make` surface the problem too.
+#
+# The leading `:` is load-bearing: $(warning) expands to nothing, so without it
+# the recipe is empty and make reports "Nothing to be done".
+_PGXNTOOL_DUPLICATE_DOCS = $(strip $(foreach d,$(sort $(DOCS)),\
+    $(if $(word 2,$(filter $(d),$(DOCS))),$(d))))
+
+.PHONY: check-duplicate-docs
+check-duplicate-docs:
+	@:$(foreach d,$(_PGXNTOOL_DUPLICATE_DOCS),$(warning DOCS lists $(d) more than once; `make install` will fail with "will not overwrite just-created". Remove the duplicate entry.))
+
+all: check-duplicate-docs
+
 .PHONY: docclean
 docclean:
 	$(RM) $(DOCS_HTML)
