@@ -617,7 +617,7 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <div class="sect2">
 <h3 id="_check_duplicate_docs"><a class="anchor" href="#_check_duplicate_docs"></a><a class="link" href="#_check_duplicate_docs">4.2. check-duplicate-docs</a></h3>
 <div class="paragraph">
-<p>Warns if <code>$(DOCS)</code> lists the same file more than once, which would otherwise fail <code>make install</code>. See <a href="#_duplicate_docs_entries_break_make_install">Duplicate DOCS entries break <code>make install</code></a>.</p>
+<p>Warns if two <code>$(DOCS)</code> entries would install to the same filename, which would otherwise fail <code>make install</code>. See <a href="#_duplicate_docs_entries_break_make_install">Duplicate DOCS entries break <code>make install</code></a>.</p>
 </div>
 <div class="paragraph">
 <p><code>all</code> depends on this, so it also runs as part of a plain <code>make</code>, <code>make install</code> and <code>make test</code>; you only need to invoke it directly to check without building anything.</p>
@@ -1708,8 +1708,8 @@ Because of this, <code>base.mk</code> will forcibly define it to be NULL if it&#
 <div class="sect3">
 <h4 id="_duplicate_docs_entries_break_make_install"><a class="anchor" href="#_duplicate_docs_entries_break_make_install"></a><a class="link" href="#_duplicate_docs_entries_break_make_install">6.3.1. Duplicate DOCS entries break <code>make install</code></a></h4>
 <div class="paragraph">
-<p>Never list the same file in <code>DOCS</code> twice.
-PGXS&#8217;s <code>install</code> refuses to overwrite a file it just installed, so a single duplicated entry fails the whole install:</p>
+<p>Never give two <code>DOCS</code> entries the same filename.
+PGXS installs every <code>DOCS</code> entry into one flat directory and refuses to overwrite a file it just installed, so a single repeated entry — or two different paths with the same basename, such as <code>doc/foo.html</code> and <code>extra_doc/foo.html</code> — fails the whole install:</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -1717,7 +1717,7 @@ PGXS&#8217;s <code>install</code> refuses to overwrite a file it just installed,
 </div>
 </div>
 <div class="paragraph">
-<p><a href="#_check_duplicate_docs"><code>make check-duplicate-docs</code></a> warns about this first, naming each duplicated file.
+<p><a href="#_check_duplicate_docs"><code>make check-duplicate-docs</code></a> warns about this first, naming each colliding filename and the <code>DOCS</code> entries it came from.
 It runs as part of <code>all</code>, so a plain <code>make</code>, <code>make install</code> or <code>make test</code> all surface it.</p>
 </div>
 <div class="paragraph">
@@ -2102,7 +2102,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-09-15 17:24:00 -0500
+Last updated 2026-10-04 14:53:20 -0500
 </div>
 </div>
 </body>

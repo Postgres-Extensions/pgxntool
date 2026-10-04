@@ -665,9 +665,11 @@ all: html
 endif # ASCIIDOC
 
 #
-# Warn when DOCS lists the same file twice. `install` refuses to overwrite a
-# file it just installed ("will not overwrite just-created"), so a single
-# duplicated entry fails the whole install.
+# Warn when two DOCS entries share a basename. PGXS installs every DOCS entry
+# into one flat directory, and `install` refuses to overwrite a file it just
+# installed ("will not overwrite just-created"), so either a repeated entry or
+# two different paths with the same filename (e.g. doc/foo.html and
+# extra_doc/foo.html) fail the whole install.
 #
 # The dedup above covers base.mk's own committed-vs-generated .html overlap,
 # but an extension's own `DOCS +=` can collide with the doc/* wildcard just as
@@ -684,12 +686,15 @@ endif # ASCIIDOC
 #
 # The leading `:` is load-bearing: $(warning) expands to nothing, so without it
 # the recipe is empty and make reports "Nothing to be done".
-_PGXNTOOL_DUPLICATE_DOCS = $(strip $(foreach d,$(sort $(DOCS)),\
-    $(if $(word 2,$(filter $(d),$(DOCS))),$(d))))
+#
+# $(filter) treats `%` in its pattern as a wildcard, hence the escaping.
+_pgxntool_docs_named = $(strip $(foreach e,$(DOCS),$(if $(filter $(subst %,\%,$(1)),$(notdir $(e))),$(e))))
+_PGXNTOOL_DUPLICATE_DOCS = $(strip $(foreach n,$(sort $(notdir $(DOCS))),\
+    $(if $(word 2,$(call _pgxntool_docs_named,$(n))),$(n))))
 
 .PHONY: check-duplicate-docs
 check-duplicate-docs:
-	@:$(foreach d,$(_PGXNTOOL_DUPLICATE_DOCS),$(warning DOCS lists $(d) more than once; `make install` will fail with "will not overwrite just-created". Remove the duplicate entry.))
+	@:$(foreach n,$(_PGXNTOOL_DUPLICATE_DOCS),$(warning DOCS installs $(n) more than once (from: $(call _pgxntool_docs_named,$(n))); `make install` will fail with "will not overwrite just-created". Remove or rename all but one.))
 
 all: check-duplicate-docs
 
