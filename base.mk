@@ -201,7 +201,8 @@ endif
 # statement that raises a hard error only aborts psql (non-zero exit, which
 # pg_regress does report as a failure) if ON_ERROR_STOP is set. So it is
 # entirely up to each test/install/*.sql file to `\set ON_ERROR_STOP on` (or
-# `\i test/pgxntool/psql.sql`, which already does) if it wants failures
+# `\i test/pgxntool/psql.sql`, which already does, as long as the file never
+# turns it back off) if it wants failures
 # caught at all. check-test-install-error-stop below enforces this by
 # default; see PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK to disable it.
 #
