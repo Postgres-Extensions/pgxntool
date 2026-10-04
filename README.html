@@ -709,7 +709,7 @@ While you can still run <code>make installcheck</code> or any other valid PGXS m
 <div class="title">Note</div>
 </td>
 <td class="content">
-This also means a stale or simply wrong <code>test/build/expected/*.out</code>&#8201;&#8212;&#8201;not just a genuinely broken build&#8201;&#8212;&#8201;blocks the whole suite. See <a href="#_build_results">build-results</a> below for the supported way to refresh it, including how to handle a file that&#8217;s <strong>supposed</strong> to show an error.
+This also means a stale or simply wrong <code>test/build/expected/*.out</code>&#8201;&#8212;&#8201;not just a genuinely broken build&#8201;&#8212;&#8201;blocks the whole suite. See <a href="#_results_build">results-build</a> below for the supported way to refresh it, including how to handle a file that&#8217;s <strong>supposed</strong> to show an error.
 </td>
 </tr>
 </table>
@@ -799,20 +799,20 @@ ROLLBACK;</pre>
 <p>When <code>CREATE EXTENSION</code> fails, PostgreSQL shows only "syntax error" with limited context. Running the SQL directly via <code>\i</code> shows the exact line and position of errors, making debugging much faster.</p>
 </div>
 <div class="sect3">
-<h4 id="_build_results"><a class="anchor" href="#_build_results"></a><a class="link" href="#_build_results">4.3.1. build-results</a></h4>
+<h4 id="_results_build"><a class="anchor" href="#_results_build"></a><a class="link" href="#_results_build">4.3.1. results-build</a></h4>
 <div class="paragraph">
 <p>Refreshes <code>test/build/expected/*.out</code> from the actual output of the last <code>test-build</code> run, mirroring <a href="#_results">results</a> for the main suite:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>make build-results</pre>
+<pre>make results-build</pre>
 </div>
 </div>
 <div class="paragraph">
-<p><code>build-results</code> will <strong>not</strong> bless a file whose actual output contains an <code>ERROR:</code> line — accepting an errored build as the new expected baseline would defeat the point of test-build. It skips that file (leaving its existing expected output in place), tells you exactly which file and the command to bless it with, and exits non-zero so the skip can&#8217;t go unnoticed.</p>
+<p><code>results-build</code> will <strong>not</strong> bless a file whose actual output contains an <code>ERROR:</code> line — accepting an errored build as the new expected baseline would defeat the point of test-build. It skips that file (leaving its existing expected output in place), tells you exactly which file and the command to bless it with, and exits non-zero so the skip can&#8217;t go unnoticed.</p>
 </div>
 <div class="paragraph">
-<p>If your project intentionally exercises a build-time error (e.g. asserting a migration fails the way it should), bless that file by hand instead — this is a deliberate, supported case, not a workaround, and you&#8217;ll need to repeat it by hand every time that file&#8217;s output legitimately changes, since <code>build-results</code> will always skip it:</p>
+<p>If your project intentionally exercises a build-time error (e.g. asserting a migration fails the way it should), bless that file by hand instead — this is a deliberate, supported case, not a workaround, and you&#8217;ll need to repeat it by hand every time that file&#8217;s output legitimately changes, since <code>results-build</code> will always skip it:</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -2134,7 +2134,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-09-15 17:16:18 -0500
+Last updated 2026-09-16 16:23:56 -0500
 </div>
 </div>
 </body>
