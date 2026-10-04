@@ -27,11 +27,11 @@ concurrency:
 
 jobs:
   claude-review:
-    # Trusted fork only, and skip drafts (don't spend API/CI on unfinished PRs).
-    # To add more trusted owners, extend the head-owner check.
+    # Trusted author only, and skip drafts (don't spend API/CI on unfinished PRs).
+    # To add more trusted authors, extend the author check.
     if: >-
       github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.owner.login == 'jnasbyupgrade'
+      github.event.pull_request.user.login == 'jnasbyupgrade'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -93,14 +93,17 @@ jobs:
         # No `repository:`/`ref:` here on purpose — this checks out the base
         # branch (master), never the fork's PR head. See the SECURITY note
         # above.
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Run Claude Code Review
         if: steps.gate.outputs.decision == 'run'
-        uses: anthropics/claude-code-action@v1
+        # Pinned to an immutable SHA: this job runs as pull_request_target with
+        # pull-requests: write, so a moved upstream tag must not change what
+        # runs -- same rationale as github-script's pin in ci.yml/protect-label.yml.
+        uses: anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Provide github_token so the action uses it directly for GitHub API
@@ -120,3 +123,14 @@ jobs:
           # provided, so no GitHub comments were posted"). Every review run
           # before this fix has been silently invisible on GitHub.
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
+          # A direct `prompt:` (no @claude mention) runs the action in "agent
+          # mode". In that mode, claude-code-action only installs the
+          # github_inline_comment MCP server if it sees
+          # mcp__github_inline_comment__create_inline_comment listed in an
+          # --allowedTools flag inside claude_args (src/modes/agent/parse-tools.ts) --
+          # it does NOT look at the code-review plugin's own `allowed-tools`
+          # frontmatter to decide that. Without this, the MCP server never
+          # starts, the tool genuinely doesn't exist in the session, and the
+          # plugin silently falls back to one consolidated PR comment instead
+          # of real inline line comments.
+          claude_args: '--allowedTools mcp__github_inline_comment__create_inline_comment'
