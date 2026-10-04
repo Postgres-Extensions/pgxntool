@@ -2010,7 +2010,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect2">
 <h3 id="_pgxntool_post_tag_version"><a class="anchor" href="#_pgxntool_post_tag_version"></a><a class="link" href="#_pgxntool_post_tag_version">8.2. PGXNTOOL_POST_TAG_VERSION</a></h3>
 <div class="paragraph">
-<p>Default: <code>stable</code>. The placeholder value <code>make post-tag-version-bump</code> sets <code>default_version</code> to. Not valid semver, but PostgreSQL doesn&#8217;t require semver for extension versions. If you override this, also update the <code>sql/*--stable.sql</code> line in your <code>.gitignore</code> to match.</p>
+<p>Default: <code>stable</code>. The placeholder value <code>make post-tag-version-bump</code> sets <code>default_version</code> to. Not valid semver, but PostgreSQL doesn&#8217;t require semver for extension versions. If you override this, also update the <code>sql/<strong>--stable.sql</code> line and its <code>!sql/</strong>--*--stable.sql</code> negation (which keeps the <code>{old}--stable</code> update script tracked) in your <code>.gitignore</code> to match.</p>
 </div>
 </div>
 <div class="sect2">
@@ -2151,7 +2151,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-04 14:25:28 -0500
+Last updated 2026-10-04 14:51:52 -0500
 </div>
 </div>
 </body>

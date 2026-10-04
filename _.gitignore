@@ -20,8 +20,10 @@ control.mk
 # Note: Version-specific files (sql/*--*.sql) are now tracked in git and should be committed
 
 # Post-tag placeholder version's generated SQL file (see PGXNTOOL_POST_TAG_VERSION
-# in README.asc's "tag" section). Update this line if you override that variable.
+# in README.asc's "post-tag-version-bump" section). Update both lines if you override that variable.
+# The negation keeps the update script (sql/{ext}--{old}--stable.sql) tracked.
 sql/*--stable.sql
+!sql/*--*--stable.sql
 
 # Test artifacts
 results/
