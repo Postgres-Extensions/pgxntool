@@ -42,9 +42,12 @@ for control_file in "$@"; do
   # everything after the closing quote (e.g. a trailing comment) untouched;
   # only the quoted value itself is replaced, and always re-quoted with single
   # quotes regardless of the original quote style.
-  tmp_file=$(mktemp "${control_file}.XXXXXX")
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/bump-default-version.XXXXXX")
   sed -E "s/^([[:space:]]*default_version[[:space:]]*=[[:space:]]*)(['\"])[^'\"]*\\2/\\1'${new_version}'/" \
     "$control_file" > "$tmp_file"
-  mv "$tmp_file" "$control_file"
+  # Copy back into the existing file instead of mv-ing over it: mktemp
+  # creates 0600, and mv would carry that mode onto the control file.
+  cat "$tmp_file" > "$control_file"
+  rm -f "$tmp_file"
   echo "Set default_version = '${new_version}' in $control_file"
 done

@@ -4,15 +4,15 @@ Recommended checklist for releasing an extension built on pgxntool. This is
 pgxntool's own release process, generalized for a standalone consumer — no
 assumptions about which org you're in or what other tooling you have.
 
+This checklist is still a work in progress; expect it to change.
+
 There is no CI automation for PGXN publishing today: every release ends
 with a manual upload to PGXN Manager.
 
 ## 1. Decide the version number
 
-- Breaking change (could break an existing user's build, tests, or
-  behavior) → bump **major**. New backward-compatible feature → bump
-  **minor**. Bugfixes only → bump **patch**.
-- Unprefixed (`1.2.3`, never `v1.2.3`).
+- pgxntool currently only directly supports version numbers made of
+  digits and periods (e.g. `1.2.3`); that's all it's tested with.
 - If your distribution provides more than one extension (`META.in.json`'s
   `provides` map has more than one entry — see README.asc's "PGXN
   Distributions vs. Extensions"), decide **per extension** whether that
@@ -81,6 +81,9 @@ merge in:
   step instead.
 - `make dist` — builds `../<dist-name>-<version>.zip` via `git archive` of
   that tag, so only committed files are included.
+- `make post-tag-version-bump` — sets `default_version` to a placeholder
+  (`stable` by default) so later `make` runs don't overwrite the versioned
+  SQL file you just released. Commit the changed `.control` file(s).
 
 ## 7. Upload to PGXN (manual)
 

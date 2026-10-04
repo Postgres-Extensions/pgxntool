@@ -1099,7 +1099,7 @@ make PGXNTOOL_ENABLE_VERIFY_RESULTS=no results</pre>
 <div class="sect2">
 <h3 id="_tag"><a class="anchor" href="#_tag"></a><a class="link" href="#_tag">4.7. tag</a></h3>
 <div class="paragraph">
-<p><code>make tag</code> will create a git tag for the current version of your extension, as determined by the META.json file (generated from <code>META.in.json</code> — see <a href="#_pgxn_distributions_vs_extensions">PGXN Distributions vs. Extensions</a>), and push it to <code>origin</code>. The reason to do this is so you can always refer to the exact code that went into a released version.</p>
+<p><code>make tag</code> will create a git tag for the current version of your extension, as determined by the META.json file (generated from <code>META.in.json</code> — see <a href="#_pgxn_distributions_vs_extensions">PGXN Distributions vs. Extensions</a>), and push it to <code>origin</code>. The reason to do this is so you can always refer to the exact code that went into a released version. For where <code>tag</code>, <code>dist</code>, and <code>post-tag-version-bump</code> fit in a full release, see <a href="releasing-with-pgxntool.md">releasing-with-pgxntool.md</a>.</p>
 </div>
 <div class="paragraph">
 <p>If a tag for the current version already exists and points at your current commit, <code>make tag</code> does nothing — this makes it safe for other targets (like <code>dist</code>) to depend on <code>tag</code> without worrying about re-running it. If the existing tag points at a <strong>different</strong> commit — meaning you likely forgot to bump the version — you&#8217;ll get an error. If you&#8217;re certain you want to over-write the tag, you can do <code>make forcetag</code>, which removes the existing tag (via <code>make rmtag</code>) and creates a new one.</p>
@@ -1123,7 +1123,7 @@ You will be very unhappy if you forget to update the .control file for your exte
 <p>Committing versioned SQL files (see <a href="#_committing_version_files">Committing Version Files</a>) means ongoing development after a release can silently regenerate and overwrite the file that was just released, since <code>make</code> always regenerates whatever file matches the current <code>default_version</code>. <code>make post-tag-version-bump</code> bumps each extension&#8217;s <code>default_version</code> to a placeholder alias&#8201;&#8212;&#8201;<code>stable</code> by default&#8201;&#8212;&#8201;so a subsequent <code>make</code> instead regenerates <code>sql/{ext}--stable.sql</code>, keeping the released file frozen.</p>
 </div>
 <div class="paragraph">
-<p>This is a deliberate, separate step&#8201;&#8212;&#8201;<strong>not</strong> wired into <code>tag</code> or <code>dist</code>. Both of those run routinely outside of an actual release (this project&#8217;s own test suite calls <code>make dist</code> freely, and <code>dist</code> is documented to leave your repository clean), so tying a tracked <code>.control</code> file mutation to every such run would both break that guarantee and risk bumping <code>default_version</code> on a version nobody actually meant to release yet. Run <code>make post-tag-version-bump</code> yourself as an explicit step in your own release process, right after the tag you&#8217;re actually releasing has been created and pushed. See <code>PGXNTOOL_POST_TAG_VERSION</code> below to customize the placeholder value.</p>
+<p>This is a deliberate, separate step&#8201;&#8212;&#8201;<strong>not</strong> wired into <code>tag</code> or <code>dist</code>. Both of those run routinely outside of an actual release (this project&#8217;s own test suite calls <code>make dist</code> freely, and <code>dist</code> is documented to leave your repository clean), so tying a tracked <code>.control</code> file mutation to every such run would both break that guarantee and risk bumping <code>default_version</code> on a version nobody actually meant to release yet. Run <code>make post-tag-version-bump</code> yourself as an explicit step in your own release process (see <a href="releasing-with-pgxntool.md">releasing-with-pgxntool.md</a> for a recommended one), right after the tag you&#8217;re actually releasing has been created and pushed. See <code>PGXNTOOL_POST_TAG_VERSION</code> below to customize the placeholder value.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1457,7 +1457,7 @@ Always pass <code>--no-print-directory</code> when invoking <code>print-pgtle</c
 1. Update <code>default_version</code> in that extension&#8217;s <code>.control</code> file
 2. Run <code>make</code> to regenerate the version-specific file
 3. Update that extension&#8217;s <code>provides.{extension}.version</code> in <code>META.in.json</code> to match by hand, and regenerate <code>META.json</code> (<code>make META.json</code>) — pgxntool won&#8217;t do this for you
-4. Update <code>META.in.json&#8217;s top-level `version</code> too if you&#8217;re also cutting a new distribution release</p>
+4. Update <code>META.in.json&#8217;s top-level `version</code> too if you&#8217;re also cutting a new distribution release (see <a href="releasing-with-pgxntool.md">releasing-with-pgxntool.md</a> for the full release checklist)</p>
 </div>
 </div>
 <div class="sect2">
@@ -2151,7 +2151,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-09-23 16:57:12 -0500
+Last updated 2026-10-04 14:25:28 -0500
 </div>
 </div>
 </body>
