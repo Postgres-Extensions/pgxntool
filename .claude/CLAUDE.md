@@ -3,26 +3,24 @@
 This file contains guidance for Claude Code when working in this repository.
 It is excluded from distributions via `.gitattributes export-ignore`.
 
+@../../ai/CLAUDE.md
+
+If that import didn't resolve (`../../ai/CLAUDE.md`, relative to this file,
+doesn't exist locally — see https://github.com/Postgres-Extensions/ai),
+clone it now per its own first instruction, then re-read it: run `git clone
+https://github.com/Postgres-Extensions/ai.git ../ai` from this repo's root
+(`pgxntool/`, not from inside `.claude/`) so `ai/` lands as a sibling of
+`pgxntool/`.
+
+Also see the `ai/` repo's `PR.md` (`../ai/PR.md` from this repo's root) for
+cross-repo conventions not restated below (CI monitoring's general
+principle, multi-session PR-ownership hygiene, executable-bit safety, shell
+script standards, etc.). This repo pairs with **pgxntool-test**, so the
+section below is a deliberate addition specific to that pairing, on top of
+those general conventions.
+
 ## CI Monitoring After Every Push
 
-**REQUIRED**: After every `git push`, immediately start a background task to
-monitor the CI run for that push. If you pushed to both pgxntool and
-pgxntool-test, start a background task for each repo — do not monitor them
-sequentially.
-
-Use `gh run watch` or poll with `gh run list` / `gh pr checks` in the
-background task. Report failures to the user as soon as they are detected;
-do not wait for all jobs to finish before reporting.
-
-## Multiple Concurrent Sessions
-
-It is common to have multiple Claude Code sessions open simultaneously across
-pgxntool and pgxntool-test. To avoid cross-session interference:
-
-**If you are asked to do something on an existing PR that you did not open or
-are not already working on in this session, immediately ask for confirmation
-before proceeding.** For example: "I see PR #32 exists. Were you asking me to
-work on that, or did you mean to send this to a different session?"
-
-This applies to: editing PR branches, pushing to them, closing/reopening them,
-adding commits, modifying PR descriptions, or any other PR-level action.
+Addition specific to this paired repo, on top of the general convention in
+`../../ai/CLAUDE.md`: if you pushed to both pgxntool and pgxntool-test,
+start a background task for each — do not monitor them sequentially.

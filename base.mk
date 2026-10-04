@@ -698,7 +698,7 @@ test-build:
 # Tradeoff: this also blocks the main suite on a stale/wrong
 # test/build/expected/*.out, not just a genuinely broken build -- there's
 # no `make results`-equivalent for test/build, so today that means either
-# hand-editing the expected file or using `make build-results` below.
+# hand-editing the expected file or using `make results-build` below.
 #
 # Guarded by _PGXNTOOL_TEST_BUILD_ACTIVE: test-build's own recipe above
 # recurses into `installcheck` to reuse PGXS's pg_regress plumbing for its
@@ -708,7 +708,7 @@ ifneq ($(_PGXNTOOL_TEST_BUILD_ACTIVE),yes)
 installcheck: test-build
 endif
 
-# build-results: bless test/build/'s actual output as the new expected
+# results-build: bless test/build/'s actual output as the new expected
 # output, mirroring `make results` for the main suite. Refuses to bless any
 # file whose actual output contains "ERROR:" -- accepting an errored build
 # as the new baseline would defeat the point of test-build. If a project
@@ -729,7 +729,7 @@ endif
 #
 # Runs test-build itself instead of duplicating its run-test-build.sh +
 # installcheck steps: by the time test-build's own regression.diffs check
-# fails, the actual output build-results needs is already on disk. But
+# fails, the actual output results-build needs is already on disk. But
 # test-build can also fail for reasons that leave nothing fresh to bless --
 # install broke, run-test-build.sh errored, pg_regress couldn't even
 # connect -- in which case test/build/results/*.out is stale leftovers from
@@ -741,11 +741,11 @@ endif
 # target Postgres instance was unreachable), so mere existence isn't
 # enough. Any other failure aborts here instead of reaching the copy loop
 # below.
-.PHONY: build-results
-build-results:
+.PHONY: results-build
+results-build:
 	@rm -f $(TESTDIR)/build/regression.diffs
 	$(MAKE) -C . test-build || test -s $(TESTDIR)/build/regression.diffs || { \
-		echo "build-results: test-build failed for a reason other than a diff to bless; not blessing stale output" >&2; \
+		echo "results-build: test-build failed for a reason other than a diff to bless; not blessing stale output" >&2; \
 		exit 1; \
 	}
 	@mkdir -p $(TESTDIR)/build/expected
@@ -753,7 +753,7 @@ build-results:
 	for f in $(TESTDIR)/build/results/*.out; do \
 		[ -f "$$f" ] || continue; \
 		if grep -q 'ERROR:' "$$f"; then \
-			echo "build-results: skipping $$f (actual output contains ERROR:)" >&2; \
+			echo "results-build: skipping $$f (actual output contains ERROR:)" >&2; \
 			echo "  If this is intentional, bless it by hand:" >&2; \
 			echo "    cp $$f $(TESTDIR)/build/expected/$$(basename "$$f")" >&2; \
 			skipped=1; continue; \
