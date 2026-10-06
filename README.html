@@ -618,7 +618,7 @@ all the targets normally provided by Postgres <a href="http://www.postgresql.org
 <div class="sect2">
 <h3 id="_check_duplicate_docs"><a class="anchor" href="#_check_duplicate_docs"></a><a class="link" href="#_check_duplicate_docs">4.2. check-duplicate-docs</a></h3>
 <div class="paragraph">
-<p>Warns if two <code>$(DOCS)</code> entries would install to the same filename, which would otherwise fail <code>make install</code>. See <a href="#_duplicate_docs_entries_break_make_install">Duplicate DOCS entries break <code>make install</code></a>.</p>
+<p>Warns if two <code>$(DOCS)</code> entries would install to the same filename, which would otherwise fail <code>make install</code>.</p>
 </div>
 <div class="paragraph">
 <p><code>all</code> depends on this, so it also runs as part of a plain <code>make</code>, <code>make install</code> and <code>make test</code>; you only need to invoke it directly to check without building anything.</p>
@@ -1765,30 +1765,6 @@ Because of this, <code>base.mk</code> will forcibly define it to be NULL if it&#
 <div class="paragraph">
 <p>PGXNtool appends <strong>all</strong> files found in all <code>$(DOC_DIRS)</code> to <code>DOCS</code>.</p>
 </div>
-<div class="sect3">
-<h4 id="_duplicate_docs_entries_break_make_install"><a class="anchor" href="#_duplicate_docs_entries_break_make_install"></a><a class="link" href="#_duplicate_docs_entries_break_make_install">6.3.1. Duplicate DOCS entries break <code>make install</code></a></h4>
-<div class="paragraph">
-<p>Never give two <code>DOCS</code> entries the same filename.
-PGXS installs every <code>DOCS</code> entry into one flat directory and refuses to overwrite a file it just installed, so a single repeated entry — or two different paths with the same basename, such as <code>doc/foo.html</code> and <code>extra_doc/foo.html</code> — fails the whole install:</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>install: will not overwrite just-created '.../doc/foo.html' with './/doc/foo.html'</pre>
-</div>
-</div>
-<div class="paragraph">
-<p><a href="#_check_duplicate_docs"><code>make check-duplicate-docs</code></a> warns about this first, naming each colliding filename and the <code>DOCS</code> entries it came from.
-It runs as part of <code>all</code>, so a plain <code>make</code>, <code>make install</code> or <code>make test</code> all surface it.</p>
-</div>
-<div class="paragraph">
-<p>The likeliest way to hit this is a <code>DOCS +=</code> line in your own Makefile naming a file that already lives under one of the <code>$(DOC_DIRS)</code> directories — PGXNtool has already added every file it found there.</p>
-</div>
-<div class="paragraph">
-<p>PGXNtool&#8217;s own version of this collision — a <code>doc/foo.html</code> both committed to git (picked up by the <code>$(DOC_DIRS)</code> wildcard) and generated from <code>doc/foo.asc</code> (picked up by <code>$(ASCIIDOC_HTML)</code>) — was fixed in 2.0.0 and needs nothing from you.
-An extension that still vendors a pre-2.0.0 pgxntool hits it on any machine that has <code>asciidoctor</code> or <code>asciidoc</code> installed, and not on the ones that don&#8217;t, which is what makes it easy to mistake for a local environment problem.
-Run <code>make pgxntool-sync</code> (see <a href="#_pgxntool_sync">pgxntool-sync</a>) to pull in a current pgxntool; <code>make &#8230;&#8203; ASCIIDOC=</code> works as a stopgap until you do.</p>
-</div>
-</div>
 </div>
 </div>
 </div>
@@ -2168,7 +2144,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-04 14:56:15 -0500
+Last updated 2026-10-06 14:14:01 -0500
 </div>
 </div>
 </body>

@@ -800,30 +800,13 @@ all: html
 
 endif # ASCIIDOC
 
+# Warn when two DOCS entries share a basename: PGXS installs DOCS into one flat
+# directory, so `install` fails with "will not overwrite just-created".
 #
-# Warn when two DOCS entries share a basename. PGXS installs every DOCS entry
-# into one flat directory, and `install` refuses to overwrite a file it just
-# installed ("will not overwrite just-created"), so either a repeated entry or
-# two different paths with the same filename (e.g. doc/foo.html and
-# extra_doc/foo.html) fail the whole install.
-#
-# The dedup above covers base.mk's own committed-vs-generated .html overlap,
-# but an extension's own `DOCS +=` can collide with the doc/* wildcard just as
-# easily, which is what this catches.
-#
-# This has to be a recipe rather than a parse-time $(warning): an extension's
-# Makefile appends to DOCS *after* it includes base.mk, so nothing evaluated
-# while base.mk is being read can see the final list. Make expands a recipe
-# just before running it, by which point every makefile has been read, so
-# $(warning) here reports the fully-assembled value. It hangs off `all` rather
-# than `install` because PGXS's `install` depends on `all` -- so this still
-# runs before anything is installed -- while `all` is also the default goal,
-# making a plain `make` surface the problem too.
-#
-# The leading `:` is load-bearing: $(warning) expands to nothing, so without it
-# the recipe is empty and make reports "Nothing to be done".
-#
-# $(filter) treats `%` in its pattern as a wildcard, hence the escaping.
+# A recipe, not a parse-time $(warning), because extensions append to DOCS after
+# including base.mk. Hung off `all` so a plain `make` reports it too.
+# The leading `:` keeps the recipe non-empty ($(warning) expands to nothing).
+# `%` is escaped because $(filter) treats it as a wildcard.
 _pgxntool_docs_named = $(strip $(foreach e,$(DOCS),$(if $(filter $(subst %,\%,$(1)),$(notdir $(e))),$(e))))
 _PGXNTOOL_DUPLICATE_DOCS = $(strip $(foreach n,$(sort $(notdir $(DOCS))),\
     $(if $(word 2,$(call _pgxntool_docs_named,$(n))),$(n))))
