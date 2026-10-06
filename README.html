@@ -2078,7 +2078,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect2">
 <h3 id="_pgxntool_enable_test_install_error_stop_check"><a class="anchor" href="#_pgxntool_enable_test_install_error_stop_check"></a><a class="link" href="#_pgxntool_enable_test_install_error_stop_check">8.11. PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK *</a></h3>
 <div class="paragraph">
-<p>Default: <code>yes</code>. Enables or disables a build-time check that every <code>test/install/*.sql</code> file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>)&#8201;&#8212;&#8201;see <a href="#_testinstall">test/install</a> for why this is the only thing that makes a hard error in one of those files actually fail the build. Set to <code>no</code> to disable the check.</p>
+<p>Default: <code>yes</code>. Enables or disables a build-time check that every <code>test/install/*.sql</code> file either includes <code>test/pgxntool/psql.sql</code> (which sets <code>ON_ERROR_STOP</code>) or has its own <code>\set ON_ERROR_STOP</code> or <code>\unset ON_ERROR_STOP</code> command; a file that sets <code>ON_ERROR_STOP</code> itself, to any value, is assumed to know what it&#8217;s doing&#8201;&#8212;&#8201;see <a href="#_testinstall">test/install</a> for why this is the only thing that makes a hard error in one of those files actually fail the build. Set to <code>no</code> to disable the check.</p>
 </div>
 </div>
 <div class="sect2">
@@ -2147,7 +2147,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-06 14:18:17 -0500
+Last updated 2026-10-06 15:25:25 -0500
 </div>
 </div>
 </body>
