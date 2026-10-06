@@ -806,6 +806,23 @@ all: html
 
 endif # ASCIIDOC
 
+# Warn when two DOCS entries share a basename: PGXS installs DOCS into one flat
+# directory, so `install` fails with "will not overwrite just-created".
+#
+# A recipe, not a parse-time $(warning), because extensions append to DOCS after
+# including base.mk. Hung off `all` so a plain `make` reports it too.
+# The leading `:` keeps the recipe non-empty ($(warning) expands to nothing).
+# `%` is escaped because $(filter) treats it as a wildcard.
+_pgxntool_docs_named = $(strip $(foreach e,$(DOCS),$(if $(filter $(subst %,\%,$(1)),$(notdir $(e))),$(e))))
+_PGXNTOOL_DUPLICATE_DOCS = $(strip $(foreach n,$(sort $(notdir $(DOCS))),\
+    $(if $(word 2,$(call _pgxntool_docs_named,$(n))),$(n))))
+
+.PHONY: check-duplicate-docs
+check-duplicate-docs:
+	@:$(foreach n,$(_PGXNTOOL_DUPLICATE_DOCS),$(warning DOCS installs $(n) more than once (from: $(call _pgxntool_docs_named,$(n))); `make install` will fail with "will not overwrite just-created". Remove or rename all but one.))
+
+all: check-duplicate-docs
+
 .PHONY: docclean
 docclean:
 	$(RM) $(DOCS_HTML)
