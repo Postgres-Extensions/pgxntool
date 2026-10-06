@@ -12,9 +12,12 @@ sequentially.
 The CI monitor lives in the pgxntool-test checkout: run
 `bash ../pgxntool-test/.claude/skills/ci/scripts/monitor-ci.sh` (the `/ci`
 skill). It monitors both repos and derives the owner from the current repo.
-Pass the exact push SHA when available — `gh run list --branch` has a race
-condition: if two pushes land close together on the same branch, `--branch`
-may pick up the wrong run. `--commit SHA` targets the exact push and avoids it.
+Pass the exact push SHA(s) as positional arguments when available (the
+script takes `[repos] [branch] [sha_pgxntool_test] [sha_pgxntool]`, not a
+`--commit` flag — see the `/ci` skill for exact usage) — `gh run list
+--branch` has a race condition: if two pushes land close together on the
+same branch, `--branch` may pick up the wrong run. An exact SHA targets
+the push directly and avoids this.
 
 ## Scope of This File
 
