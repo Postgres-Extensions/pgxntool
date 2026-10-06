@@ -812,16 +812,17 @@ docclean:
 # your Makefile if you push tags somewhere other than origin.
 PGXN_REMOTE ?= origin
 
-# Recipe line: fail when the tree has uncommitted or untracked changes.
-_PGXNTOOL_REQUIRE_CLEAN_TREE = @test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
+# Fail when the tree has uncommitted or untracked changes.
+.PHONY: tree-is-clean
+tree-is-clean:
+	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
 
 rmtag:
 	git fetch $(PGXN_REMOTE) # Update our remotes
 	@test -z "$$(git tag --list $(PGXNVERSION))" || git tag -d $(PGXNVERSION)
 	@test -z "$$(git ls-remote --tags $(PGXN_REMOTE) $(PGXNVERSION) | grep -v '{}')" || git push --delete $(PGXN_REMOTE) $(PGXNVERSION)
 
-tag:
-	$(_PGXNTOOL_REQUIRE_CLEAN_TREE)
+tag: tree-is-clean
 	@# Skip if tag already exists and points to HEAD
 	@if git rev-parse $(PGXNVERSION) >/dev/null 2>&1; then \
 		if [ "$$(git rev-parse $(PGXNVERSION))" = "$$(git rev-parse HEAD)" ]; then \
@@ -835,17 +836,14 @@ tag:
 	fi
 	git push $(PGXN_REMOTE) $(PGXNVERSION)
 
-# post-tag-version-bump: set default_version to a placeholder after tagging a
-# release. Run by hand; not wired into tag/dist (see README.asc).
-#
-# PGXNTOOL_POST_TAG_VERSION: the placeholder version (default "stable")
-# _PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT: bump script path (test seam)
+# Placeholder default_version set after a release.
 PGXNTOOL_POST_TAG_VERSION ?= stable
+# Test seam: bump script path.
 _PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT ?= $(PGXNTOOL_DIR)/bump-default-version.sh
 
+# Set default_version to the placeholder after tagging a release.
 .PHONY: post-tag-version-bump
-post-tag-version-bump:
-	$(_PGXNTOOL_REQUIRE_CLEAN_TREE)
+post-tag-version-bump: tree-is-clean
 	$(_PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT) $(PGXNTOOL_POST_TAG_VERSION) $(_PGXNTOOL_CONTROL_FILES)
 
 .PHONY: forcetag

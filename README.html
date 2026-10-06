@@ -455,17 +455,18 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_testdeps">4.5. testdeps</a></li>
 <li><a href="#_results">4.6. results</a></li>
 <li><a href="#_tag">4.7. tag</a></li>
-<li><a href="#_post_tag_version_bump">4.8. post-tag-version-bump</a></li>
-<li><a href="#_dist">4.9. dist</a></li>
-<li><a href="#_pgxntool_sync">4.10. pgxntool-sync</a></li>
-<li><a href="#_pgxntool_version">4.11. pgxntool-version</a></li>
-<li><a href="#_list">4.12. list</a></li>
-<li><a href="#_print">4.13. print-%</a></li>
-<li><a href="#_distclean">4.14. distclean</a></li>
-<li><a href="#_pgtle">4.15. pgtle</a></li>
-<li><a href="#_check_pgtle">4.16. check-pgtle</a></li>
-<li><a href="#_run_pgtle">4.17. run-pgtle</a></li>
-<li><a href="#_print_pgtle">4.18. print-pgtle</a></li>
+<li><a href="#_tree_is_clean">4.8. tree-is-clean</a></li>
+<li><a href="#_post_tag_version_bump">4.9. post-tag-version-bump</a></li>
+<li><a href="#_dist">4.10. dist</a></li>
+<li><a href="#_pgxntool_sync">4.11. pgxntool-sync</a></li>
+<li><a href="#_pgxntool_version">4.12. pgxntool-version</a></li>
+<li><a href="#_list">4.13. list</a></li>
+<li><a href="#_print">4.14. print-%</a></li>
+<li><a href="#_distclean">4.15. distclean</a></li>
+<li><a href="#_pgtle">4.16. pgtle</a></li>
+<li><a href="#_check_pgtle">4.17. check-pgtle</a></li>
+<li><a href="#_run_pgtle">4.18. run-pgtle</a></li>
+<li><a href="#_print_pgtle">4.19. print-pgtle</a></li>
 </ul>
 </li>
 <li><a href="#_version_specific_sql_files">5. Version-Specific SQL Files</a>
@@ -1121,7 +1122,13 @@ You will be very unhappy if you forget to update the .control file for your exte
 </div>
 </div>
 <div class="sect2">
-<h3 id="_post_tag_version_bump"><a class="anchor" href="#_post_tag_version_bump"></a><a class="link" href="#_post_tag_version_bump">4.8. post-tag-version-bump</a></h3>
+<h3 id="_tree_is_clean"><a class="anchor" href="#_tree_is_clean"></a><a class="link" href="#_tree_is_clean">4.8. tree-is-clean</a></h3>
+<div class="paragraph">
+<p><code>make tree-is-clean</code> fails, printing <code>git status</code>, if the working tree has uncommitted or untracked changes. <code>tag</code> and <code>post-tag-version-bump</code> depend on it.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_post_tag_version_bump"><a class="anchor" href="#_post_tag_version_bump"></a><a class="link" href="#_post_tag_version_bump">4.9. post-tag-version-bump</a></h3>
 <div class="paragraph">
 <p>Committing versioned SQL files (see <a href="#_committing_version_files">Committing Version Files</a>) means ongoing development after a release can silently regenerate and overwrite the file that was just released, since <code>make</code> always regenerates whatever file matches the current <code>default_version</code>. <code>make post-tag-version-bump</code> bumps each extension&#8217;s <code>default_version</code> to a placeholder alias&#8201;&#8212;&#8201;<code>stable</code> by default&#8201;&#8212;&#8201;so a subsequent <code>make</code> instead regenerates <code>sql/{ext}--stable.sql</code>, keeping the released file frozen.</p>
 </div>
@@ -1130,7 +1137,7 @@ You will be very unhappy if you forget to update the .control file for your exte
 </div>
 </div>
 <div class="sect2">
-<h3 id="_dist"><a class="anchor" href="#_dist"></a><a class="link" href="#_dist">4.9. dist</a></h3>
+<h3 id="_dist"><a class="anchor" href="#_dist"></a><a class="link" href="#_dist">4.10. dist</a></h3>
 <div class="paragraph">
 <p><code>make dist</code> will create a .zip file for your current version that you can upload to PGXN. It first runs <code>tag</code> (creating/pushing the version&#8217;s git tag as described above if needed), then uses <code>git archive</code> at that tag to build the .zip file, so the archive always matches the exact tagged commit. The file is named after the PGXN name and version (the top-level "name" and "version" attributes in META.json, generated from <code>META.in.json</code>). The .zip file is placed in the <strong>parent</strong> directory so as not to clutter up your git repo.</p>
 </div>
@@ -1163,7 +1170,7 @@ If your project has a <code>.gitattributes</code> file, <code>make dist</code>/<
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_sync"><a class="anchor" href="#_pgxntool_sync"></a><a class="link" href="#_pgxntool_sync">4.10. pgxntool-sync</a></h3>
+<h3 id="_pgxntool_sync"><a class="anchor" href="#_pgxntool_sync"></a><a class="link" href="#_pgxntool_sync">4.11. pgxntool-sync</a></h3>
 <div class="paragraph">
 <p>This rule will pull down the latest released version of PGXNtool via <code>git subtree pull</code> and then reconcile the files <code>setup.sh</code> copied into your project (<code>.gitignore</code>, <code>test/deps.sql</code>) with a 3-way merge (it also verifies the <code>test/pgxntool</code> symlink, recreating it if missing).</p>
 </div>
@@ -1229,7 +1236,7 @@ There is also a <code>pgxntool-sync-%</code> rule if you need to do more advance
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgxntool_version"><a class="anchor" href="#_pgxntool_version"></a><a class="link" href="#_pgxntool_version">4.11. pgxntool-version</a></h3>
+<h3 id="_pgxntool_version"><a class="anchor" href="#_pgxntool_version"></a><a class="link" href="#_pgxntool_version">4.12. pgxntool-version</a></h3>
 <div class="paragraph">
 <p><code>make pgxntool-version</code> prints the version of the embedded pgxntool copy, read from the first line of <code>pgxntool/HISTORY.asc</code>. That line is "STABLE" instead of a version number if this copy was synced from an unreleased commit rather than a tagged release.</p>
 </div>
@@ -1247,19 +1254,19 @@ The actual work is done by <code>pgxntool/bin/version</code>, so you can run it 
 </div>
 </div>
 <div class="sect2">
-<h3 id="_list"><a class="anchor" href="#_list"></a><a class="link" href="#_list">4.12. list</a></h3>
+<h3 id="_list"><a class="anchor" href="#_list"></a><a class="link" href="#_list">4.13. list</a></h3>
 <div class="paragraph">
 <p><code>make list</code> prints every make target defined in your project — including ones provided by PGXS and pgxntool, not just ones you wrote — one per line. Useful for discovering what&#8217;s available without reading through the Makefile.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_print"><a class="anchor" href="#_print"></a><a class="link" href="#_print">4.13. print-%</a></h3>
+<h3 id="_print"><a class="anchor" href="#_print"></a><a class="link" href="#_print">4.14. print-%</a></h3>
 <div class="paragraph">
 <p><code>make print-VARNAME</code> prints the current value (and origin) of any make variable, e.g. <code>make print-PGXNVERSION</code>. Useful for debugging why a variable isn&#8217;t set to what you expect.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_distclean"><a class="anchor" href="#_distclean"></a><a class="link" href="#_distclean">4.14. distclean</a></h3>
+<h3 id="_distclean"><a class="anchor" href="#_distclean"></a><a class="link" href="#_distclean">4.15. distclean</a></h3>
 <div class="paragraph">
 <p><code>make distclean</code> removes generated configuration files (<code>META.json</code> — generated from <code>META.in.json</code> — plus <code>meta.mk</code> and <code>control.mk</code>) that survive a normal <code>make clean</code>.</p>
 </div>
@@ -1285,7 +1292,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.15. pgtle</a></h3>
+<h3 id="_pgtle"><a class="anchor" href="#_pgtle"></a><a class="link" href="#_pgtle">4.16. pgtle</a></h3>
 <div class="paragraph">
 <p>Generates pg_tle (Trusted Language Extensions) registration SQL files for deploying extensions in managed environments like AWS RDS/Aurora. See <a href="#_pg_tle_Support">[_pg_tle_Support]</a> for complete documentation.</p>
 </div>
@@ -1302,7 +1309,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.16. check-pgtle</a></h3>
+<h3 id="_check_pgtle"><a class="anchor" href="#_check_pgtle"></a><a class="link" href="#_check_pgtle">4.17. check-pgtle</a></h3>
 <div class="paragraph">
 <p>Checks if pg_tle is installed and reports the version. This target:
 - Reports the version from <code>pg_extension</code> if <code>CREATE EXTENSION pg_tle</code> has been run in the database
@@ -1318,7 +1325,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="sect2">
-<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.17. run-pgtle</a></h3>
+<h3 id="_run_pgtle"><a class="anchor" href="#_run_pgtle"></a><a class="link" href="#_run_pgtle">4.18. run-pgtle</a></h3>
 <div class="paragraph">
 <p>Registers all extensions with pg_tle by executing the generated pg_tle registration SQL files in a PostgreSQL database. This target:
 - Requires pg_tle to be installed in the target database. This isn&#8217;t a make-level dependency on <code>check-pgtle</code> — <code>pgtle.sh</code> checks it itself when it runs, and will tell you to run <code>make check-pgtle</code> if pg_tle isn&#8217;t there
@@ -1355,7 +1362,7 @@ The <code>pgtle</code> target is a dependency, so <code>make run-pgtle</code> wi
 </div>
 </div>
 <div class="sect2">
-<h3 id="_print_pgtle"><a class="anchor" href="#_print_pgtle"></a><a class="link" href="#_print_pgtle">4.18. print-pgtle</a></h3>
+<h3 id="_print_pgtle"><a class="anchor" href="#_print_pgtle"></a><a class="link" href="#_print_pgtle">4.19. print-pgtle</a></h3>
 <div class="paragraph">
 <p>Prints the generated pg_tle registration SQL to stdout instead of running it, for consumers building a combined multi-extension install file. This target:
 - Depends on <code>pgtle</code>, so the SQL files are (re)generated first
@@ -2154,7 +2161,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-06 13:55:58 -0500
+Last updated 2026-10-06 15:17:52 -0500
 </div>
 </div>
 </body>
