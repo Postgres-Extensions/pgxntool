@@ -812,7 +812,7 @@ docclean:
 # your Makefile if you push tags somewhere other than origin.
 PGXN_REMOTE ?= origin
 
-# Recipe line shared by tag and post-tag-version-bump: fail on uncommitted changes.
+# Recipe line: fail when the tree has uncommitted or untracked changes.
 _PGXNTOOL_REQUIRE_CLEAN_TREE = @test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
 
 rmtag:
