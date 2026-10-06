@@ -259,8 +259,9 @@ endif
 
 # Variable: PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK
 #   - Gates check-test-install-error-stop (see TEST_DEPS wiring below): fails
-#     the build if any test/install/*.sql file doesn't set ON_ERROR_STOP,
-#     directly or via `\i test/pgxntool/psql.sql` -- see the IMPORTANT note
+#     the build if a test/install/*.sql file neither includes
+#     test/pgxntool/psql.sql nor has its own `\set`/`\unset ON_ERROR_STOP`
+#     (any value counts) -- see the IMPORTANT note
 #     above for why this is the only thing standing between a hard SQL error
 #     and a silent "pass".
 #   - Allowed values: "yes" or "no" (case-insensitive)
@@ -480,9 +481,11 @@ endif
 # ------------------------------------------------------------------------------
 # Purpose: test/install/*.sql files never get a real pg_regress diff (see the
 # IMPORTANT note in the test/install section above) -- ON_ERROR_STOP is the
-# only thing that still turns a hard SQL error into a build failure. This is
-# a pure static scan of file contents, so unlike check-stale-expected it
-# doesn't need to run after installcheck -- it needs no ordering edge at all.
+# only thing that still turns a hard SQL error into a build failure. A file
+# passes if it includes test/pgxntool/psql.sql or has any `\set`/`\unset
+# ON_ERROR_STOP` command of its own. This is a pure static scan of file
+# contents, so unlike check-stale-expected it doesn't need to run after
+# installcheck -- it needs no ordering edge at all.
 #
 # See PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK above to disable.
 ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL),yes)

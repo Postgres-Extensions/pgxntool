@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
 #
-# check-test-install-error-stop.sh - Ensure test/install/*.sql files set
-# ON_ERROR_STOP
+# check-test-install-error-stop.sh - Ensure test/install/*.sql files deal
+# with ON_ERROR_STOP
 #
-# test/install/*.sql files run in pg_regress's own self-comparing entry (see
-# the test/install comments in base.mk): actual output lands on top of the
-# expected file, so there's no real diff to catch a bad result. The only
-# thing that still fails the build is psql itself exiting non-zero -- which
-# only happens if ON_ERROR_STOP is set. Without it, a hard SQL error is
-# printed and swallowed, and the file "passes". This scans for that safety
-# net so its absence is caught at build time instead of discovered the hard
-# way (issue #97).
+# A file fails only if it neither includes test/pgxntool/psql.sql (which sets
+# ON_ERROR_STOP) nor has any `\set ON_ERROR_STOP` or `\unset ON_ERROR_STOP`
+# command. A file that touches ON_ERROR_STOP at all, to any value, is assumed
+# to know what it's doing.
 #
-# A file passes if it either sets ON_ERROR_STOP itself, or sources
-# test/pgxntool/psql.sql (which already sets it, among other things).
+# Why: test/install/*.sql files run in pg_regress's own self-comparing entry
+# (see the test/install comments in base.mk), so there's no real diff. The
+# only thing that still fails the build is psql exiting non-zero, which needs
+# ON_ERROR_STOP; without it a hard SQL error is swallowed (issue #97).
 #
 # Usage: check-test-install-error-stop.sh <testdir>
 
@@ -30,17 +28,21 @@ testdir="$1"
 install_dir="$testdir/install"
 missing=()
 
+# Succeeds if $1 includes psql.sql or sets/unsets ON_ERROR_STOP.
+handles_error_stop() {
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ \\ir?[[:space:]]+.*psql\.sql ]] ||
+       [[ "$line" =~ \\(un)?set[[:space:]]+ON_ERROR_STOP([[:space:]]|$) ]]; then
+      return 0
+    fi
+  done < "$1"
+  return 1
+}
+
 for f in "$install_dir"/*.sql; do
   [ -f "$f" ] || continue
-
-  if grep -q 'ON_ERROR_STOP' "$f"; then
-    continue
-  fi
-  if grep -qE '\\ir? +.*psql\.sql' "$f"; then
-    continue
-  fi
-
-  missing+=("$f")
+  handles_error_stop "$f" || missing+=("$f: never sets ON_ERROR_STOP")
 done
 
 if [ "${#missing[@]}" -gt 0 ]; then
@@ -49,8 +51,8 @@ if [ "${#missing[@]}" -gt 0 ]; then
   error "test/install files run in their own self-comparing pg_regress entry" \
     "(see the test/install comments in base.mk) -- without ON_ERROR_STOP, a" \
     "hard SQL error is silently swallowed instead of failing the build."
-  die 1 "Add '\\set ON_ERROR_STOP on' near the top of the file, or" \
-    "'\\i test/pgxntool/psql.sql' (which already sets it)."
+  die 1 "Add '\\set ON_ERROR_STOP on' near the top of the file, or include" \
+    "test/pgxntool/psql.sql (which sets it)."
 fi
 
 # vi: expandtab ts=2 sw=2
