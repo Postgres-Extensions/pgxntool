@@ -812,13 +812,16 @@ docclean:
 # your Makefile if you push tags somewhere other than origin.
 PGXN_REMOTE ?= origin
 
+# Recipe line shared by tag and post-tag-version-bump: fail on uncommitted changes.
+_PGXNTOOL_REQUIRE_CLEAN_TREE = @test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
+
 rmtag:
 	git fetch $(PGXN_REMOTE) # Update our remotes
 	@test -z "$$(git tag --list $(PGXNVERSION))" || git tag -d $(PGXNVERSION)
 	@test -z "$$(git ls-remote --tags $(PGXN_REMOTE) $(PGXNVERSION) | grep -v '{}')" || git push --delete $(PGXN_REMOTE) $(PGXNVERSION)
 
 tag:
-	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes!'; echo; git status; exit 1)
+	$(_PGXNTOOL_REQUIRE_CLEAN_TREE)
 	@# Skip if tag already exists and points to HEAD
 	@if git rev-parse $(PGXNVERSION) >/dev/null 2>&1; then \
 		if [ "$$(git rev-parse $(PGXNVERSION))" = "$$(git rev-parse HEAD)" ]; then \
@@ -832,27 +835,17 @@ tag:
 	fi
 	git push $(PGXN_REMOTE) $(PGXNVERSION)
 
-# ------------------------------------------------------------------------------
-# post-tag-version-bump: freeze a just-released version, move to a placeholder
-# ------------------------------------------------------------------------------
-# Run by hand right after tagging a release; deliberately not wired into
-# tag/dist. See README.asc's "post-tag-version-bump" section for why.
+# post-tag-version-bump: set default_version to a placeholder after tagging a
+# release. Run by hand; not wired into tag/dist (see README.asc).
 #
-# Variable: PGXNTOOL_POST_TAG_VERSION
-#   - The placeholder value default_version is bumped to
-#   - Default: "stable" -- not valid semver, but PostgreSQL doesn't require
-#     semver for extension versions
-#
-# Variable: _PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT (internal shim, not user-facing)
-#   - Path to the script this target invokes to perform the bump
-#   - Default: $(PGXNTOOL_DIR)/bump-default-version.sh
-#
+# PGXNTOOL_POST_TAG_VERSION: the placeholder version (default "stable")
+# _PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT: bump script path (test seam)
 PGXNTOOL_POST_TAG_VERSION ?= stable
 _PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT ?= $(PGXNTOOL_DIR)/bump-default-version.sh
 
 .PHONY: post-tag-version-bump
 post-tag-version-bump:
-	@test -z "$$(git status --porcelain)" || (echo 'Untracked changes! Commit or stash before bumping default_version.'; echo; git status; exit 1)
+	$(_PGXNTOOL_REQUIRE_CLEAN_TREE)
 	$(_PGXNTOOL_POST_TAG_VERSION_BUMP_SCRIPT) $(PGXNTOOL_POST_TAG_VERSION) $(_PGXNTOOL_CONTROL_FILES)
 
 .PHONY: forcetag
