@@ -666,7 +666,7 @@ print-pgtle: pgtle
 		cat "$$f";)
 
 # These targets ensure all the relevant directories exist
-$(TESTDIR)/sql $(TESTDIR)/expected/ $(TESTOUT)/results/:
+$(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/:
 	@mkdir -p $@
 # pg_regress aborts with "could not open file" if an expected output file is
 # missing, so create empty placeholders for any test that lacks one.

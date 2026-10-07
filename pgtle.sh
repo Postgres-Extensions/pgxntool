@@ -2,7 +2,7 @@
 #
 # pgtle.sh - Generate pg_tle registration SQL for PostgreSQL extensions
 #
-# Part of pgxntool: https://github.com/decibel/pgxntool
+# Part of pgxntool: https://github.com/Postgres-Extensions/pgxntool
 #
 # SYNOPSIS
 #   pgtle.sh --extension EXTNAME [--pgtle-version VERSION]
@@ -112,7 +112,7 @@
 #   1   Error (missing files, validation failure, C code detected, etc.)
 #
 # SEE ALSO
-#   pgxntool/README-pgtle.md - Complete user guide
+#   pgxntool/README.asc, "pg_tle Support" section - Complete user guide
 #   https://github.com/aws/pg_tle - pg_tle documentation
 #
 
@@ -620,7 +620,7 @@ validate_delimiter() {
        Found: $PGTLE_DELIMITER
        This delimiter is used internally by pgtle.sh to wrap SQL content.
        You must modify your SQL to not contain this string. If this poses a
-       serious problem, please open an issue at https://github.com/decibel/pgxntool/issues"
+       serious problem, please open an issue at https://github.com/Postgres-Extensions/pgxntool/issues"
     fi
 }
 
