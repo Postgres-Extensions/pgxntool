@@ -272,7 +272,7 @@ else
   PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK = yes
 endif
 
-_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-test-install-error-stop.sh
+_PGXNTOOL_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-test-install-error-stop.sh
 
 # ------------------------------------------------------------------------------
 # verify-results: Safeguard for make results
@@ -492,7 +492,7 @@ ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL),yes)
 ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK),yes)
 .PHONY: check-test-install-error-stop
 check-test-install-error-stop:
-	@$(_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT) $(TESTDIR)
+	@$(_PGXNTOOL_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT) $(TESTDIR)
 TEST_DEPS += check-test-install-error-stop
 endif
 endif
