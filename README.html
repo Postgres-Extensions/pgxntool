@@ -1082,7 +1082,7 @@ It will probably cause problems if you try to create a <code>testdeps</code> rul
 <div class="sect3">
 <h4 id="_verify_results_safeguard"><a class="anchor" href="#_verify_results_safeguard"></a><a class="link" href="#_verify_results_safeguard">4.7.1. verify-results safeguard</a></h4>
 <div class="paragraph">
-<p>By default, <code>make results</code> will refuse to run if your tests are failing, so you can&#8217;t accidentally promote incorrect output into the new expected results. Which failures it looks for is controlled by <code>PGXNTOOL_VERIFY_RESULTS_MODE</code>:</p>
+<p>By default, <code>make results</code> will refuse to run if your tests are failing, so you can&#8217;t accidentally promote incorrect output into the new expected results. Which failures it looks for is controlled by <code>PGXNTOOL_VERIFY_RESULTS_MODE</code>, which must be one of these two values (case-insensitive; anything else is a hard <code>make</code> error):</p>
 </div>
 <div class="dlist">
 <dl>
@@ -2118,7 +2118,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect2">
 <h3 id="_pgxntool_verify_results_mode"><a class="anchor" href="#_pgxntool_verify_results_mode"></a><a class="link" href="#_pgxntool_verify_results_mode">8.9. PGXNTOOL_VERIFY_RESULTS_MODE</a></h3>
 <div class="paragraph">
-<p>Default: <code>pgtap</code>. Controls how the <a href="#_verify_results_safeguard">verify-results safeguard</a> decides whether tests are failing.</p>
+<p>Default: <code>pgtap</code>. Controls how the <a href="#_verify_results_safeguard">verify-results safeguard</a> decides whether tests are failing. Must be <code>pgtap</code> or <code>diffs</code> (case-insensitive) when given explicitly; any other value, including an empty one, is a hard <code>make</code> error.</p>
 </div>
 <div class="sect3">
 <h4 id="_pgtap"><a class="anchor" href="#_pgtap"></a><a class="link" href="#_pgtap">8.9.1. pgtap</a></h4>
@@ -2217,7 +2217,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-07 16:35:22 -0500
+Last updated 2026-10-07 16:52:43 -0500
 </div>
 </div>
 </body>
