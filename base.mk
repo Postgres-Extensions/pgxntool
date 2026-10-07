@@ -257,6 +257,9 @@ ifdef PGXNTOOL_ENABLE_TEST_INSTALL
   # override needed so command-line values (make VAR=YES) are normalized, not silently ignored.
   # := needed for immediate evaluation of the function call (avoids infinite recursion with =).
   override PGXNTOOL_ENABLE_TEST_INSTALL := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_TEST_INSTALL),PGXNTOOL_ENABLE_TEST_INSTALL)
+  ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL)$(strip $(TEST_INSTALL_SQL_FILES)),yes)
+    $(error no .sql files found in $(TESTDIR)/install/ (PGXNTOOL_ENABLE_TEST_INSTALL=yes))
+  endif
 else
   # Auto-detect: enable if test/install/ directory has SQL files
   ifneq ($(strip $(TEST_INSTALL_SQL_FILES)),)
