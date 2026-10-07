@@ -91,9 +91,9 @@ pgxntool_validate_yesno = $(strip \
 
 # Helper function: normalize a single-word variable to lowercase and validate
 # it against a list of allowed values.
-# Usage: $(call pgxntool_validate_choice,VALUE,VARIABLE_NAME,ALLOWED_VALUES)
+# Usage: $(call _pgxntool_validate_choice,VALUE,VARIABLE_NAME,ALLOWED_VALUES)
 # Returns the lowercase value, or errors if it isn't exactly one of ALLOWED_VALUES.
-pgxntool_validate_choice = $(strip \
+_pgxntool_validate_choice = $(strip \
   $(if $(and $(filter 1,$(words $(1))),$(filter $(3),$(shell echo "$(1)" | tr '[:upper:]' '[:lower:]'))),\
     $(shell echo "$(1)" | tr '[:upper:]' '[:lower:]'),\
     $(error $(2) must be one of: $(3); got "$(1)")))
@@ -320,7 +320,7 @@ endif
 
 # Default mode: pgtap (scans results/*.out for TAP failures)
 PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
-override PGXNTOOL_VERIFY_RESULTS_MODE := $(call pgxntool_validate_choice,$(PGXNTOOL_VERIFY_RESULTS_MODE),PGXNTOOL_VERIFY_RESULTS_MODE,pgtap diffs)
+override PGXNTOOL_VERIFY_RESULTS_MODE := $(call _pgxntool_validate_choice,$(PGXNTOOL_VERIFY_RESULTS_MODE),PGXNTOOL_VERIFY_RESULTS_MODE,pgtap diffs)
 
 # ------------------------------------------------------------------------------
 # _check-stale-expected: catch orphaned/unexpected test/expected/ files
