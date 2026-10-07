@@ -33,11 +33,11 @@ start a background task for each — do not monitor them sequentially.
   including seams that exist so pgxntool-test can stub a script. Internal
   make targets likewise start with `_` (e.g. `_check-stale-expected`), which
   also keeps them out of `make list`.
-- Older unprefixed internal variables (`TEST_DEPS`, `TEST_SQL_FILES`,
-  `TEST_BUILD_*`, `REGRESS_DBNAME`, `MAJORVER`, `GE91`, `PGXNTOOL_DIR`,
-  `PGXNTOOL_distclean`, ...) stay as they are, since consumers may
-  reference them. Don't rename them; give every new internal variable the
-  `_PGXNTOOL_` prefix.
+- Internal variables that predate the convention (`TEST_DEPS`,
+  `TEST_SQL_FILES`, `TEST_BUILD_*`, `REGRESS_DBNAME`, `MAJORVER`, `GE91`,
+  ..., plus `PGXNTOOL_DIR`, which keeps its bare prefix) stay as they are,
+  since consumers may reference them. Don't rename them; give every new
+  internal variable the `_PGXNTOOL_` prefix.
 
 pgxntool-test's `test/standard/make-variables.bats` checks every variable
 base.mk defines against the classified list in its
