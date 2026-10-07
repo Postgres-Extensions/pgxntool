@@ -24,3 +24,9 @@ those general conventions.
 Addition specific to this paired repo, on top of the general convention in
 `../../ai/CLAUDE.md`: if you pushed to both pgxntool and pgxntool-test,
 start a background task for each — do not monitor them sequentially.
+
+## HISTORY.asc: Sorted Issue Numbers
+
+The "Issues fixed in this release:" line in HISTORY.asc must list issue
+numbers in ascending numeric order. Re-sort it whenever you add to it or
+resolve a merge conflict in it, e.g. `#21, #55, #87, #90, #108, #115`.
