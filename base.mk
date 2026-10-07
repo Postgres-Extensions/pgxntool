@@ -89,6 +89,15 @@ pgxntool_validate_yesno = $(strip \
     $(shell echo "$(1)" | tr '[:upper:]' '[:lower:]'),\
     $(error $(2) must be "yes" or "no", got "$(1)")))
 
+# Helper function: normalize a single-word variable to lowercase and validate
+# it against a list of allowed values.
+# Usage: $(call pgxntool_validate_choice,VALUE,VARIABLE_NAME,ALLOWED_VALUES)
+# Returns the lowercase value, or errors if it isn't exactly one of ALLOWED_VALUES.
+pgxntool_validate_choice = $(strip \
+  $(if $(and $(filter 1,$(words $(1))),$(filter $(3),$(shell echo "$(1)" | tr '[:upper:]' '[:lower:]'))),\
+    $(shell echo "$(1)" | tr '[:upper:]' '[:lower:]'),\
+    $(error $(2) must be one of: $(3); got "$(1)")))
+
 # ------------------------------------------------------------------------------
 # test-build: Sanity check extension files before running full test suite
 # ------------------------------------------------------------------------------
@@ -288,6 +297,8 @@ _CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-test-ins
 #
 # Variable: PGXNTOOL_VERIFY_RESULTS_MODE
 #   - Controls how verify-results detects test failures
+#   - Allowed values: "pgtap" or "diffs" (case-insensitive); anything else,
+#     including an empty value, is a parse-time error
 #   - "pgtap" (default): scans test/results/*.out for "not ok" lines and plan
 #     mismatches (TAP failures). Also checks regression.diffs as a fallback.
 #     Use this mode when your test suite uses pgTap.
@@ -306,6 +317,7 @@ endif
 
 # Default mode: pgtap (scans results/*.out for TAP failures)
 PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
+override PGXNTOOL_VERIFY_RESULTS_MODE := $(call pgxntool_validate_choice,$(PGXNTOOL_VERIFY_RESULTS_MODE),PGXNTOOL_VERIFY_RESULTS_MODE,pgtap diffs)
 
 # ------------------------------------------------------------------------------
 # check-stale-expected: catch orphaned/unexpected test/expected/ files
