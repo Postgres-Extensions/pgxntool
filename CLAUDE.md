@@ -91,7 +91,7 @@ https://github.com/Postgres-Extensions/pgxntool-test
 Extension projects include pgxntool via git subtree:
 
 ```bash
-git subtree add -P pgxntool --squash git@github.com:decibel/pgxntool.git release
+git subtree add -P pgxntool --squash git@github.com:Postgres-Extensions/pgxntool.git release
 pgxntool/setup.sh
 ```
 
@@ -151,7 +151,7 @@ project/
 │   ├── deps.sql              # Load extension and test dependencies
 │   ├── sql/*.sql             # Test SQL files
 │   └── expected/*.out        # Expected test outputs
-└── doc/                       # Optional docs (*.adoc, *.asciidoc)
+└── doc/                       # Optional docs (*.adoc, *.asciidoc, *.asc)
 ```
 
 ## Commands for Extension Developers (End Users)
@@ -160,7 +160,7 @@ These are the commands extension developers use (documented for context):
 
 ```bash
 make                    # Build extension (generates versioned SQL, docs)
-make test              # Full test: testdeps → install → installcheck → show diffs
+make test              # Full test: testdeps → [test-build] → [install] → installcheck → safeguard checks → show diffs ([...] = when enabled; see Critical Testing Rules)
 make results           # Run tests and update expected output files
 make html              # Generate HTML from Asciidoc sources
 make tag               # Create git tag for current META.json version
@@ -176,9 +176,10 @@ make pgxntool-sync     # Update to latest pgxntool via git subtree pull
 ### Critical Testing Rules
 
 **NEVER use `make installcheck` directly**. Always use `make test` instead. The `make test` target ensures:
-- Correct test dependency installation (`testdeps`, and `test-build` when enabled)
-- Extension is installed before tests run (`install`)
+- Correct test dependency installation (`testdeps`, and `test-build` when enabled); `testdeps`' default `pgtap` prerequisite auto-installs pgtap via `pgxn install`, a no-op when `PGXNTOOL_ENABLE_PGXN_INSTALL=no`
+- Extension is filesystem-installed before tests run (`install`), unless `PGXNTOOL_ENABLE_FS_INSTALL=no`
 - Test comparison via `installcheck`, with diffs shown on failure
+- Safeguard checks that fail the run: the stale-expected-file check (orphaned or non-`.out` files in `test/expected/`, run after `pg_regress`), and, when `test/install` is in use, the check that every `test/install/*.sql` file sets `ON_ERROR_STOP`
 
 Note: `make test` intentionally does *not* depend on `clean` — depending on `clean` caused problems with incremental/watch-based builds (see `base.mk`). If your tests need a clean build to pass, that's a sign of a missing dependency elsewhere, not something to fix by adding `clean` back.
 
@@ -223,7 +224,7 @@ When tests fail, examine the diff output carefully. The actual test output in `t
 
 ### Document Generation
 - Auto-detects `asciidoctor` or `asciidoc`
-- Generates HTML from `*.adoc` and `*.asciidoc` in `$(DOC_DIRS)`
+- Generates HTML from `*.adoc`, `*.asciidoc` and `*.asc` in `$(DOC_DIRS)`
 - HTML required for `make dist`, optional for `make install`
 - Template-based rules via `ASCIIDOC_template`
 

@@ -28,12 +28,14 @@ testdir="$1"
 install_dir="$testdir/install"
 missing=()
 
-# Succeeds if $1 includes psql.sql or sets/unsets ON_ERROR_STOP.
+# Succeeds if $1 includes psql.sql or sets/unsets ON_ERROR_STOP. Both patterns
+# are anchored to line start so a SQL comment like `-- \set ON_ERROR_STOP on`
+# doesn't count.
 handles_error_stop() {
   local line
   while IFS= read -r line || [ -n "$line" ]; do
-    if [[ "$line" =~ \\ir?[[:space:]]+.*psql\.sql ]] ||
-       [[ "$line" =~ \\(un)?set[[:space:]]+ON_ERROR_STOP([[:space:]]|$) ]]; then
+    if [[ "$line" =~ ^[[:space:]]*\\(include_relative|include|ir|i)[[:space:]]+.*psql\.sql ]] ||
+       [[ "$line" =~ ^[[:space:]]*\\(un)?set[[:space:]]+ON_ERROR_STOP([[:space:]]|$) ]]; then
       return 0
     fi
   done < "$1"
