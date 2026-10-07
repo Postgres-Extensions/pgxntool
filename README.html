@@ -926,7 +926,7 @@ PGXNTOOL_ENABLE_TEST_INSTALL = yes  # or no</pre>
 <div class="title">Warning</div>
 </td>
 <td class="content">
-<strong><code>test/install/*.out</code> is never actually compared against anything.</strong> Unlike every other test type pgxntool supports, the <code>test/install</code> directory&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The <strong>only</strong> thing that still fails the build is a hard SQL error, and only if the file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
+<strong><code>test/install/*.out</code> is never actually compared against anything.</strong> Unlike every other test type pgxntool supports, the <code>test/install</code> directory&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The <strong>only</strong> thing that still fails the build is a hard SQL error, and only if the file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>_check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
 </td>
 </tr>
 </table>
@@ -2172,7 +2172,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect2">
 <h3 id="_pgxntool_enable_check_stale_expected"><a class="anchor" href="#_pgxntool_enable_check_stale_expected"></a><a class="link" href="#_pgxntool_enable_check_stale_expected">8.16. PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED *</a></h3>
 <div class="paragraph">
-<p>Default: <code>yes</code>. Enables or disables the check-stale-expected safeguard, which fails <code>make test</code> if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains a <code>.out</code> file with no corresponding <code>.sql</code> file&#8201;&#8212;&#8201;catching a stale file left behind after a test was renamed or removed. Set to <code>no</code> to make the check a complete no-op (it&#8217;s dropped from <code>TEST_DEPS</code> entirely).</p>
+<p>Default: <code>yes</code>. Enables or disables the <code>_check-stale-expected</code> safeguard, which fails <code>make test</code> if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains a <code>.out</code> file with no corresponding <code>.sql</code> file&#8201;&#8212;&#8201;catching a stale file left behind after a test was renamed or removed. Set to <code>no</code> to make the check a complete no-op (it&#8217;s dropped from <code>TEST_DEPS</code> entirely).</p>
 </div>
 <div class="paragraph">
 <p>This is also the supported pattern for disabling one specific optional pgxntool feature: a documented <code>PGXNTOOL_ENABLE_*</code> variable, gating both the target&#8217;s registration into <code>TEST_DEPS</code>/etc. and (where applicable) the target&#8217;s own definition. Cleanly replacing or overriding an arbitrary pgxntool-generated recipe with your own entirely is a separate, larger, and not-yet-decided design question&#8201;&#8212;&#8201;see <a href="https://github.com/Postgres-Extensions/pgxntool/issues/30">issue #30</a> (two proposed approaches)&#8201;&#8212;&#8201;and is <strong>not</strong> what this mechanism solves.</p>
@@ -2181,7 +2181,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect2">
 <h3 id="_pgxntool_check_expected_file_types"><a class="anchor" href="#_pgxntool_check_expected_file_types"></a><a class="link" href="#_pgxntool_check_expected_file_types">8.17. PGXNTOOL_CHECK_EXPECTED_FILE_TYPES *</a></h3>
 <div class="paragraph">
-<p>Default: <code>yes</code>. Sub-check of check-stale-expected, independent of <code>PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED</code>: fails (with a distinct error message and exit code from the orphaned-<code>.out</code> check) if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains any file that isn&#8217;t <code>*.out</code>. Set to <code>no</code> to disable just this sub-check while leaving the orphaned-<code>.out</code> check active.</p>
+<p>Default: <code>yes</code>. Sub-check of <code>_check-stale-expected</code>, independent of <code>PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED</code>: fails (with a distinct error message and exit code from the orphaned-<code>.out</code> check) if <code>test/expected/</code> (or <code>test/build/expected/</code>) contains any file that isn&#8217;t <code>*.out</code>. Set to <code>no</code> to disable just this sub-check while leaving the orphaned-<code>.out</code> check active.</p>
 </div>
 </div>
 <div class="sect2">
@@ -2217,7 +2217,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-07 16:52:43 -0500
+Last updated 2026-10-07 17:56:47 -0500
 </div>
 </div>
 </body>
