@@ -1361,7 +1361,7 @@ PGXS doesn&#8217;t provide any special support for <code>distclean</code> — it
 </div>
 </div>
 <div class="paragraph">
-<p>The value must be one of those range names exactly; it is not mapped from a plain pg_tle version. Any other value (e.g. <code>1.5.0</code>) is not validated and produces a bogus <code>pg_tle/1.5.0/</code> directory.</p>
+<p>The value must be one of those range names exactly; it is not mapped from a plain pg_tle version. Any other value is rejected with an error listing the valid ranges; for a plain pg_tle version (e.g. <code>1.5.0</code>), the error also names the range it falls in.</p>
 </div>
 </div>
 <div class="sect2">
@@ -2088,7 +2088,7 @@ Variables marked with <code>*</code> must be set to exactly <code>yes</code> or 
 <div class="sect2">
 <h3 id="_pgxntool_pgtle_version"><a class="anchor" href="#_pgxntool_pgtle_version"></a><a class="link" href="#_pgxntool_pgtle_version">8.4. PGXNTOOL_PGTLE_VERSION</a></h3>
 <div class="paragraph">
-<p>Default: unset (generates every known pg_tle version range). Set on the command line to a range name (<code>1.0.0-1.4.0</code>, <code>1.4.0-1.5.0</code> or <code>1.5.0+</code>, exactly) to limit <code>make pgtle</code> to that one range; any other value is passed through unvalidated and generates a bogus <code>pg_tle/&lt;value&gt;/</code> directory. Not named <code>PGTLE_VERSION</code>: make auto-imports same-named environment variables, and that name collided silently with CI jobs that set a <code>PGTLE_VERSION</code> env var for an unrelated purpose (which pg_tle to test against). See <a href="#_pgtle">pgtle</a>.</p>
+<p>Default: unset (generates every known pg_tle version range). Set on the command line to a range name (<code>1.0.0-1.4.0</code>, <code>1.4.0-1.5.0</code> or <code>1.5.0+</code>, exactly) to limit <code>make pgtle</code> to that one range; any other value is rejected with an error. Not named <code>PGTLE_VERSION</code>: make auto-imports same-named environment variables, and that name collided silently with CI jobs that set a <code>PGTLE_VERSION</code> env var for an unrelated purpose (which pg_tle to test against). See <a href="#_pgtle">pgtle</a>.</p>
 </div>
 </div>
 <div class="sect2">
@@ -2217,7 +2217,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-07 16:10:44 -0500
+Last updated 2026-10-07 16:35:22 -0500
 </div>
 </div>
 </body>
