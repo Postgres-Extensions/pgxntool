@@ -202,7 +202,7 @@ endif
 # pg_regress does report as a failure) if ON_ERROR_STOP is set. So it is
 # entirely up to each test/install/*.sql file to `\set ON_ERROR_STOP on` (or
 # `\i test/pgxntool/psql.sql`, which already does) if it wants failures
-# caught at all. check-test-install-error-stop below enforces this by
+# caught at all. _check-test-install-error-stop below enforces this by
 # default; see PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK to disable it.
 #
 # Why not just force `-v ON_ERROR_STOP=1` onto the psql invocation instead of
@@ -258,7 +258,7 @@ else
 endif
 
 # Variable: PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK
-#   - Gates check-test-install-error-stop (see TEST_DEPS wiring below): fails
+#   - Gates _check-test-install-error-stop (see TEST_DEPS wiring below): fails
 #     the build if a test/install/*.sql file neither includes
 #     test/pgxntool/psql.sql nor has its own `\set`/`\unset ON_ERROR_STOP`
 #     (any value counts) -- see the IMPORTANT note
@@ -308,7 +308,7 @@ endif
 PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
 
 # ------------------------------------------------------------------------------
-# check-stale-expected: catch orphaned/unexpected test/expected/ files
+# _check-stale-expected: catch orphaned/unexpected test/expected/ files
 # ------------------------------------------------------------------------------
 # Variable: PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED
 #   - Can be set manually in Makefile or command line
@@ -323,16 +323,16 @@ PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
 #   - Allowed values: "yes" or "no" (case-insensitive)
 #   - Default: "yes"
 #   - Set to "no" to disable just this sub-check while leaving the rest of
-#     check-stale-expected (the orphaned-.out check) active
+#     _check-stale-expected (the orphaned-.out check) active
 #   - Passed through to check-stale-expected.sh; see that script for the
 #     distinct error message/exit code this sub-check uses
 #
 # Variable: _PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT (internal shim, not user-facing)
-#   - Path to the script the check-stale-expected target invokes
+#   - Path to the script the _check-stale-expected target invokes
 #   - Default: $(PGXNTOOL_DIR)/test/bin/check-stale-expected.sh
 #
-# Implementation: See check-stale-expected target definition (search for
-# "check-stale-expected:" in this file)
+# Implementation: See _check-stale-expected target definition (search for
+# "_check-stale-expected:" in this file)
 #
 ifdef PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED
   override PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED)
@@ -427,11 +427,11 @@ installcheck: $(TEST_RESULT_FILES) $(TEST_SQL_FILES) | $(TESTDIR)/sql/ $(TESTDIR
 # installed (CREATE EXTENSION requires the control/SQL files to be in place).
 # PGXS's own installcheck target doesn't declare that dependency -- it assumes
 # the caller runs `make install installcheck` manually. That assumption breaks
-# when something else (e.g. check-stale-expected below) depends on installcheck
+# when something else (e.g. _check-stale-expected below) depends on installcheck
 # directly: `test`'s TEST_DEPS lists install/installcheck as independent,
 # unordered prerequisites, so nothing stops installcheck's own prerequisite
 # chain from running before install. An explicit edge here, same as
-# check-stale-expected's, is the only ordering guarantee Make actually gives.
+# _check-stale-expected's, is the only ordering guarantee Make actually gives.
 #
 # Gated behind PGXNTOOL_ENABLE_FS_INSTALL (see its definition above): when
 # disabled, `installcheck` must run against whatever is already installed
@@ -452,7 +452,7 @@ endif
 TEST_DEPS = testdeps
 
 # ------------------------------------------------------------------------------
-# check-stale-expected: catch orphaned/unexpected test/expected/ files
+# _check-stale-expected: catch orphaned/unexpected test/expected/ files
 # ------------------------------------------------------------------------------
 # Purpose: test/expected/*.out must mirror test/sql/*.sql 1:1 (likewise
 # test/build/expected/*.out vs test/build/*.sql, when test-build is in use).
@@ -470,30 +470,30 @@ TEST_DEPS = testdeps
 # See PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED / PGXNTOOL_CHECK_EXPECTED_FILE_TYPES
 # above for how to disable this entirely or just its non-.out file sub-check.
 ifeq ($(PGXNTOOL_ENABLE_CHECK_STALE_EXPECTED),yes)
-.PHONY: check-stale-expected
-check-stale-expected: installcheck
+.PHONY: _check-stale-expected
+_check-stale-expected: installcheck
 	@$(_PGXNTOOL_CHECK_STALE_EXPECTED_SCRIPT) $(TESTDIR) $(PGXNTOOL_CHECK_EXPECTED_FILE_TYPES)
-TEST_DEPS += check-stale-expected
+TEST_DEPS += _check-stale-expected
 endif
 
 # ------------------------------------------------------------------------------
-# check-test-install-error-stop: catch missing ON_ERROR_STOP in test/install
+# _check-test-install-error-stop: catch missing ON_ERROR_STOP in test/install
 # ------------------------------------------------------------------------------
 # Purpose: test/install/*.sql files never get a real pg_regress diff (see the
 # IMPORTANT note in the test/install section above) -- ON_ERROR_STOP is the
 # only thing that still turns a hard SQL error into a build failure. A file
 # passes if it includes test/pgxntool/psql.sql or has any `\set`/`\unset
 # ON_ERROR_STOP` command of its own. This is a pure static scan of file
-# contents, so unlike check-stale-expected it doesn't need to run after
+# contents, so unlike _check-stale-expected it doesn't need to run after
 # installcheck -- it needs no ordering edge at all.
 #
 # See PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK above to disable.
 ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL),yes)
 ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK),yes)
-.PHONY: check-test-install-error-stop
-check-test-install-error-stop:
+.PHONY: _check-test-install-error-stop
+_check-test-install-error-stop:
 	@$(_PGXNTOOL_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT) $(TESTDIR)
-TEST_DEPS += check-test-install-error-stop
+TEST_DEPS += _check-test-install-error-stop
 endif
 endif
 
@@ -970,7 +970,7 @@ endif
 #
 #
 # This declaration is deliberately OUTSIDE the ifeq below (unlike e.g.
-# check-stale-expected's own .PHONY, which lives inside its ifeq): testdeps'
+# _check-stale-expected's own .PHONY, which lives inside its ifeq): testdeps'
 # own `testdeps: pgtap` prerequisite (see testdeps' definition) is
 # unconditional, so pgtap must always resolve to *some* rule. Without this
 # unconditional .PHONY, disabling the block below would leave `pgtap`
