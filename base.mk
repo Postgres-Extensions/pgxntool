@@ -403,9 +403,17 @@ EXTRA_CLEAN += $(_PGXNTOOL_INSTALL_SCHEDULE)
 # Add install schedule; REGRESS stays as-is (regular tests run after schedule)
 REGRESS_OPTS += --schedule=$(_PGXNTOOL_INSTALL_SCHEDULE)
 
-# Always regenerate schedule file to catch added/removed files
+# Always regenerate schedule file to catch added/removed files.
+#
+# Erroring here, rather than at parse time, means only the test path fails
+# when PGXNTOOL_ENABLE_TEST_INSTALL=yes but test/install/ has no SQL files;
+# clean, dist, etc. keep working.
 .PHONY: $(_PGXNTOOL_INSTALL_SCHEDULE)
 $(_PGXNTOOL_INSTALL_SCHEDULE):
+	@if [ -z "$(strip $(TEST_INSTALL_SQL_FILES))" ]; then \
+		echo "ERROR: no .sql files found in $(TESTDIR)/install/ (PGXNTOOL_ENABLE_TEST_INSTALL=yes)" >&2; \
+		exit 1; \
+	fi
 	@echo "# Auto-generated - DO NOT EDIT" > $@
 	@for f in $(notdir $(basename $(TEST_INSTALL_SQL_FILES))); do \
 		echo "test: ../install/$$f" >> $@; \
