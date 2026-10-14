@@ -423,7 +423,7 @@ REGRESS_OPTS += --schedule=$(_PGXNTOOL_INSTALL_SCHEDULE)
 $(_PGXNTOOL_INSTALL_SCHEDULE):
 	@echo "# Auto-generated - DO NOT EDIT" > $@
 	@for f in $(notdir $(basename $(TEST_INSTALL_SQL_FILES))); do \
-		echo "test: ../install/$$f" >> $@; \
+		echo "test: ../install/$$f" >> $@ || exit 1; \
 	done
 
 installcheck: $(_PGXNTOOL_INSTALL_SCHEDULE)
@@ -579,7 +579,7 @@ endif
 	@mkdir -p $(TESTDIR)/expected
 	@for f in $(TESTOUT)/results/*.out; do \
 		[ -f "$$f" ] || continue; \
-		cp "$$f" $(TESTDIR)/expected/$$(basename "$$f"); \
+		cp "$$f" $(TESTDIR)/expected/$$(basename "$$f") || exit 1; \
 	done
 
 # testdeps is a generic dependency target that you can add targets to
@@ -605,8 +605,9 @@ _PGXNTOOL_EXTENSIONS = $(basename $(_PGXNTOOL_CONTROL_FILES))
 # with this variable silently instead of erroring.
 .PHONY: pgtle
 pgtle: all control.mk $(_PGXNTOOL_CONTROL_FILES)
-	@$(foreach ext,$(_PGXNTOOL_EXTENSIONS),\
-		$(PGXNTOOL_DIR)/pgtle.sh --extension $(ext) $(if $(PGXNTOOL_PGTLE_VERSION),--pgtle-version $(PGXNTOOL_PGTLE_VERSION));)
+	@for ext in $(_PGXNTOOL_EXTENSIONS); do \
+		$(PGXNTOOL_DIR)/pgtle.sh --extension $$ext $(if $(PGXNTOOL_PGTLE_VERSION),--pgtle-version $(PGXNTOOL_PGTLE_VERSION)) || exit 1; \
+	done
 
 #
 # pg_tle installation support
@@ -670,7 +671,7 @@ print-pgtle: pgtle
 			echo "ERROR: $$f does not exist (run 'make pgtle' first)" >&2; \
 			exit 1; \
 		fi; \
-		cat "$$f";)
+		cat "$$f" || exit 1;)
 
 # These targets ensure all the relevant directories exist
 $(TESTDIR)/sql/ $(TESTDIR)/expected/ $(TESTOUT)/results/:
@@ -779,7 +780,7 @@ results-build:
 			echo "    cp $$f $(TESTDIR)/build/expected/$$(basename "$$f")" >&2; \
 			skipped=1; continue; \
 		fi; \
-		cp "$$f" $(TESTDIR)/build/expected/$$(basename "$$f"); \
+		cp "$$f" $(TESTDIR)/build/expected/$$(basename "$$f") || exit 1; \
 	done; \
 	[ "$$skipped" = 0 ] || exit 1
 endif
