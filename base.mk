@@ -200,11 +200,16 @@ endif
 # IMPORTANT: test/install does NOT get a real pg_regress diff, unlike every
 # other test type pgxntool supports. Its schedule entries reference the
 # original file via a relative "../install/<name>" path, so pg_regress
-# resolves BOTH the expected output and the actual output to the exact same
-# file (test/install/<name>.out) -- the actual run silently overwrites the
-# expected file in place, rather than ever comparing it against anything. A
-# content difference (wrong output, a changed column, whatever) will NEVER
-# fail this way, no matter how it changes -- see issue #97.
+# resolves the expected output to $(TESTDIR)/install/<name>.out and the actual
+# output to $(TESTOUT)/install/<name>.out. When TESTOUT differs from TESTDIR,
+# $(TESTOUT)/install is a symlink to $(TESTDIR)/install (see
+# _test-install-output-link), so the output always lands in
+# $(TESTDIR)/install/ and both paths are the same file. The actual run
+# silently overwrites the expected file in place, rather than ever comparing
+# it against anything. A content
+# difference (wrong output, a changed column, whatever) will NEVER fail this
+# way, no matter how it changes -- see issue #97. The TAP check (see
+# PGXNTOOL_VERIFY_RESULTS_MODE) does still scan that actual output.
 #
 # The only thing that forces the build to fail is psql's own exit code: a
 # statement that raises a hard error only aborts psql (non-zero exit, which
@@ -299,17 +304,31 @@ _PGXNTOOL_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check
 #   - Usage: Controls whether verify-results target exists and blocks make results
 #
 # Variable: PGXNTOOL_VERIFY_RESULTS_MODE
-#   - Controls how verify-results detects test failures
-#   - Allowed values: "pgtap" or "diffs" (case-insensitive); anything else,
-#     including an empty value, is a parse-time error
-#   - "pgtap" (default): scans test/results/*.out for "not ok" lines and plan
-#     mismatches (TAP failures). Also checks regression.diffs as a fallback.
-#     Use this mode when your test suite uses pgTap.
-#   - "diffs": checks only for regression.diffs existence (classic pg_regress behavior)
-#     Use this mode when your tests use plain SQL expected-output comparison only.
+#   - Controls how verify-results and `make test` detect test failures,
+#     including whether `make test` runs the TAP check
+#   - Allowed values: "pgtap", "pgtap-only" or "diffs" (case-insensitive);
+#     anything else, including an empty value, is a parse-time error
+#   - "pgtap" (default): runs check-tap-output.sh over $(TESTOUT)/results/*.out
+#     and the test/install actual output, failing on a `not ok` without
+#     `# TODO`, a missing or duplicate plan line, or a plan/test count
+#     mismatch -- even when the output matches its expected file. Also
+#     checks regression.diffs. Applies to both `make test` and
+#     verify-results. Use this mode when your test suite uses pgTap.
+#   - "pgtap-only": like "pgtap", but a test whose result file is TAP output
+#     passes on its TAP and on having no SQL error line; its regression.diffs
+#     block is ignored, in `make test` as well as verify-results. For pgTap
+#     suites whose assertion descriptions vary per run.
+#   - "diffs": checks only for regression.diffs existence (classic pg_regress
+#     behavior); `make test` skips the TAP check. Use this mode when your
+#     tests use plain SQL expected-output comparison only.
 #
-# Implementation: See verify-results target definition and results target modification
-#                 (search for "verify-results" and "results:" in this file)
+# Variable: _PGXNTOOL_CHECK_TAP_OUTPUT_SCRIPT (internal shim, not user-facing)
+#   - Path to the script the `test` recipe invokes
+#   - Default: $(PGXNTOOL_DIR)/test/bin/check-tap-output.sh
+#
+# Implementation: See verify-results target definition, results target modification
+#                 and the `test:` recipe (search for "verify-results", "results:"
+#                 and "test: $(TEST_DEPS)" in this file)
 #
 ifdef PGXNTOOL_ENABLE_VERIFY_RESULTS
   override PGXNTOOL_ENABLE_VERIFY_RESULTS := $(call pgxntool_validate_yesno,$(PGXNTOOL_ENABLE_VERIFY_RESULTS),PGXNTOOL_ENABLE_VERIFY_RESULTS)
@@ -320,7 +339,9 @@ endif
 
 # Default mode: pgtap (scans results/*.out for TAP failures)
 PGXNTOOL_VERIFY_RESULTS_MODE ?= pgtap
-override PGXNTOOL_VERIFY_RESULTS_MODE := $(call _pgxntool_validate_choice,$(PGXNTOOL_VERIFY_RESULTS_MODE),PGXNTOOL_VERIFY_RESULTS_MODE,pgtap diffs)
+override PGXNTOOL_VERIFY_RESULTS_MODE := $(call _pgxntool_validate_choice,$(PGXNTOOL_VERIFY_RESULTS_MODE),PGXNTOOL_VERIFY_RESULTS_MODE,pgtap pgtap-only diffs)
+
+_PGXNTOOL_CHECK_TAP_OUTPUT_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check-tap-output.sh
 
 # ------------------------------------------------------------------------------
 # _check-stale-expected: catch orphaned/unexpected test/expected/ files
@@ -415,6 +436,10 @@ ifeq ($(PGXNTOOL_ENABLE_TEST_INSTALL),yes)
 _PGXNTOOL_INSTALL_SCHEDULE = $(TESTDIR)/install/schedule
 EXTRA_CLEAN += $(_PGXNTOOL_INSTALL_SCHEDULE)
 
+# Actual output of each install file (see the test/install section above),
+# for the TAP output check.
+_PGXNTOOL_TEST_INSTALL_OUTPUT_FILES = $(TEST_INSTALL_SQL_FILES:.sql=.out)
+
 # Add install schedule; REGRESS stays as-is (regular tests run after schedule)
 REGRESS_OPTS += --schedule=$(_PGXNTOOL_INSTALL_SCHEDULE)
 
@@ -427,6 +452,24 @@ $(_PGXNTOOL_INSTALL_SCHEDULE):
 	done
 
 installcheck: $(_PGXNTOOL_INSTALL_SCHEDULE)
+
+# pg_regress writes the actual output to $(TESTOUT)/results/../install/ but
+# diffs it against $(TESTDIR)/expected/../install/; those only agree if
+# $(TESTOUT)/install and $(TESTDIR)/install are the same directory. Never
+# replace something else already at that path: it isn't ours to delete.
+ifneq ($(abspath $(TESTOUT)),$(abspath $(TESTDIR)))
+.PHONY: _test-install-output-link
+_test-install-output-link:
+	@link='$(TESTOUT)/install'; target='$(abspath $(TESTDIR)/install)'; \
+	if [ -L "$$link" ] && [ "$$(readlink "$$link")" = "$$target" ]; then exit 0; fi; \
+	if [ -e "$$link" ] || [ -L "$$link" ]; then \
+		echo "ERROR: $$link exists and is not a symlink to $$target" >&2; \
+		echo "test/install output must land in $$target; remove $$link and rerun" >&2; \
+		exit 1; \
+	fi; \
+	mkdir -p '$(TESTOUT)' && ln -s "$$target" "$$link"
+installcheck: | _test-install-output-link
+endif
 endif
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -529,8 +572,22 @@ ifeq ($(PGXNTOOL_ENABLE_FS_INSTALL),yes)
 TEST_DEPS += install
 endif
 TEST_DEPS += installcheck
+#
+# The TAP check runs in this recipe rather than as a TEST_DEPS target so that
+# `make PGXNTOOL_ENABLE_VERIFY_RESULTS=no results` (which depends on TEST_DEPS,
+# not on `test`) still blesses output unconditionally. Outside diffs mode both
+# checks always run, so a failure reports TAP problems and regression.diffs together. In
+# pgtap-only mode, verify-results-pgtap.sh decides which regression.diffs
+# blocks still count.
 test: $(TEST_DEPS)
+ifneq ($(PGXNTOOL_VERIFY_RESULTS_MODE),diffs)
+	@status=0; \
+	$(_PGXNTOOL_CHECK_TAP_OUTPUT_SCRIPT) $(TESTOUT)/results/*.out $(_PGXNTOOL_TEST_INSTALL_OUTPUT_FILES) || status=1; \
+	$(if $(filter pgtap-only,$(PGXNTOOL_VERIFY_RESULTS_MODE)),$(PGXNTOOL_DIR)/verify-results-pgtap.sh --pgtap-only --for-test $(TESTOUT) || status=1;,if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; status=1; fi;) \
+	exit $$status
+else
 	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; exit 1; fi
+endif
 
 #
 # verify-results: Safeguard for make results
@@ -538,9 +595,9 @@ test: $(TEST_DEPS)
 # Checks if tests are passing before allowing make results to proceed
 ifeq ($(PGXNTOOL_ENABLE_VERIFY_RESULTS),yes)
 .PHONY: verify-results
-ifeq ($(PGXNTOOL_VERIFY_RESULTS_MODE),pgtap)
+ifneq ($(PGXNTOOL_VERIFY_RESULTS_MODE),diffs)
 verify-results:
-	@$(PGXNTOOL_DIR)/verify-results-pgtap.sh $(TESTOUT)
+	@$(PGXNTOOL_DIR)/verify-results-pgtap.sh $(if $(filter pgtap-only,$(PGXNTOOL_VERIFY_RESULTS_MODE)),--pgtap-only )$(TESTOUT) $(_PGXNTOOL_TEST_INSTALL_OUTPUT_FILES)
 else
 verify-results:
 	@if [ -r $(TESTOUT)/regression.diffs ]; then \
