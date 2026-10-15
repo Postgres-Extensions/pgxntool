@@ -850,7 +850,13 @@ ROLLBACK;</pre>
 <div class="sect2">
 <h3 id="_testinstall"><a class="anchor" href="#_testinstall"></a><a class="link" href="#_testinstall">4.5. test/install</a></h3>
 <div class="paragraph">
-<p>Runs setup files before the main test suite within the same <code>pg_regress</code> invocation. This allows expensive one-time operations (like extension installation) to set up state that persists into the regular test files.</p>
+<p><code>test/install</code> only prepares the environment for your real tests; its output is not a test result. If a file in it fails, the run aborts, but short of a failure nothing about its output is checked: it is not compared against expected output and not validated as TAP, so don&#8217;t write tests there (put them in <code>test/sql</code>).</p>
+</div>
+<div class="paragraph">
+<p>Abort-on-failure relies on <code>ON_ERROR_STOP</code>: pgxntool&#8217;s static check requires every <code>test/install/*.sql</code> file to include <code>test/pgxntool/psql.sql</code> (which sets it) or to <code>\set</code> or <code>\unset ON_ERROR_STOP</code> itself. An explicit setting means the author has chosen deliberately.</p>
+</div>
+<div class="paragraph">
+<p>It runs setup files before the main test suite within the same <code>pg_regress</code> invocation. This allows expensive one-time operations (like extension installation) to set up state that persists into the regular test files.</p>
 </div>
 <div class="paragraph">
 <p><strong>How it works:</strong></p>
@@ -914,7 +920,7 @@ PGXNTOOL_ENABLE_TEST_INSTALL = yes  # or no</pre>
 <p><strong>Why this is useful:</strong></p>
 </div>
 <div class="paragraph">
-<p>Without <code>test/install</code>, each test file typically needs to run <code>CREATE EXTENSION</code> in its setup, which adds overhead and doesn&#8217;t allow validating the installation step separately. With <code>test/install</code>, setup runs once before all tests, and any state it creates (tables, extensions, etc.) is available to every subsequent test file.</p>
+<p>Without <code>test/install</code>, each test file typically needs to run <code>CREATE EXTENSION</code> in its setup, which adds overhead and repeats the installation step in every test. With <code>test/install</code>, setup runs once before all tests, and any state it creates (tables, extensions, etc.) is available to every subsequent test file.</p>
 </div>
 <div class="paragraph">
 <p><strong>Key detail:</strong> Install files and regular tests run in a single <code>pg_regress</code> invocation. This means the database is NOT dropped between install and test phases — state created by install files persists into the main test suite.</p>
@@ -926,7 +932,7 @@ PGXNTOOL_ENABLE_TEST_INSTALL = yes  # or no</pre>
 <div class="title">Warning</div>
 </td>
 <td class="content">
-<strong><code>test/install/*.out</code> is never actually compared against anything.</strong> Unlike every other test type pgxntool supports, the <code>test/install</code> directory&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The <strong>only</strong> thing that still fails the build is a hard SQL error, and only if the file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>_check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
+<strong><code>test/install/*.out</code> is not a test result and is never compared against anything.</strong> Unlike every other test type pgxntool supports, the <code>test/install</code> directory&#8217;s actual output is written to the exact same file as its expected output, so there is no diff — a wrong or changed result will never fail the build, no matter how much it changes. The <strong>only</strong> thing that still fails the build is a hard SQL error, and only if the file sets <code>ON_ERROR_STOP</code> (directly, or via <code>\i test/pgxntool/psql.sql</code>) — without it, psql prints the error, keeps going, and the file "passes" regardless. pgxntool enforces this by default (<code>_check-test-install-error-stop</code>, see <code>PGXNTOOL_ENABLE_TEST_INSTALL_ERROR_STOP_CHECK</code> to disable), but that only guarantees errors are caught — it does not give you real output validation. If you need actual output comparison, put that logic in <code>test/sql</code> instead (or use pgTap assertions from within the install file itself).
 </td>
 </tr>
 </table>
@@ -2217,7 +2223,7 @@ but that PGXNtool has no part in. It currently covers which <code>.control</code
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2026-10-07 17:56:47 -0500
+Last updated 2026-10-15 17:03:08 -0500
 </div>
 </div>
 </body>
