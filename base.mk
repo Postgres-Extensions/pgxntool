@@ -201,10 +201,12 @@ endif
 # other test type pgxntool supports. Its schedule entries reference the
 # original file via a relative "../install/<name>" path, so pg_regress
 # resolves BOTH the expected output and the actual output to the exact same
-# file (test/install/<name>.out) -- the actual run silently overwrites the
-# expected file in place, rather than ever comparing it against anything. A
-# content difference (wrong output, a changed column, whatever) will NEVER
-# fail this way, no matter how it changes -- see issue #97.
+# file ($(TESTDIR)/install/<name>.out; when TESTOUT differs from TESTDIR,
+# _test-install-output-link makes that hold) -- the actual run silently
+# overwrites the expected file in place, rather than ever comparing it
+# against anything. A content difference (wrong output, a changed column,
+# whatever) will NEVER fail this way, no matter how it changes -- see issue
+# #97.
 #
 # The only thing that forces the build to fail is psql's own exit code: a
 # statement that raises a hard error only aborts psql (non-zero exit, which
@@ -427,6 +429,24 @@ $(_PGXNTOOL_INSTALL_SCHEDULE):
 	done
 
 installcheck: $(_PGXNTOOL_INSTALL_SCHEDULE)
+
+# pg_regress writes the actual output to $(TESTOUT)/results/../install/ but
+# diffs it against $(TESTDIR)/expected/../install/; those only agree if
+# $(TESTOUT)/install and $(TESTDIR)/install are the same directory. Never
+# replace something else already at that path: it isn't ours to delete.
+ifneq ($(abspath $(TESTOUT)),$(abspath $(TESTDIR)))
+.PHONY: _test-install-output-link
+_test-install-output-link:
+	@link='$(TESTOUT)/install'; target='$(abspath $(TESTDIR)/install)'; \
+	if [ -L "$$link" ] && [ "$$(readlink "$$link")" = "$$target" ]; then exit 0; fi; \
+	if [ -e "$$link" ] || [ -L "$$link" ]; then \
+		echo "ERROR: $$link exists and is not a symlink to $$target" >&2; \
+		echo "test/install output must land in $$target; remove $$link and rerun" >&2; \
+		exit 1; \
+	fi; \
+	mkdir -p '$(TESTOUT)' && ln -s "$$target" "$$link"
+installcheck: | _test-install-output-link
+endif
 endif
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -705,10 +725,11 @@ test-build: install
 endif
 test-build:
 	@$(PGXNTOOL_DIR)/run-test-build.sh $(TESTDIR)
-	$(MAKE) -C . _PGXNTOOL_TEST_BUILD_ACTIVE=yes REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTDIR)/build" installcheck
-	@if [ -r $(TESTDIR)/build/regression.diffs ]; then \
-		echo "test-build failed - see $(TESTDIR)/build/regression.diffs"; \
-		cat $(TESTDIR)/build/regression.diffs; \
+	@mkdir -p $(TESTOUT)/build
+	$(MAKE) -C . _PGXNTOOL_TEST_BUILD_ACTIVE=yes REGRESS="$(TEST_BUILD_REGRESS)" REGRESS_OPTS="--inputdir=$(TESTDIR)/build --outputdir=$(TESTOUT)/build" installcheck
+	@if [ -r $(TESTOUT)/build/regression.diffs ]; then \
+		echo "test-build failed - see $(TESTOUT)/build/regression.diffs"; \
+		cat $(TESTOUT)/build/regression.diffs; \
 		exit 1; \
 	fi
 
@@ -735,12 +756,12 @@ endif
 # as the new baseline would defeat the point of test-build. If a project
 # intentionally exercises an error case in test/build (e.g. verifying a
 # migration fails as expected), bless that file by hand instead:
-#   cp $(TESTDIR)/build/results/<name>.out $(TESTDIR)/build/expected/<name>.out
+#   cp $(TESTOUT)/build/results/<name>.out $(TESTDIR)/build/expected/<name>.out
 #
 # This ERROR-scanning safeguard is only possible because test-build writes
 # actual output to a location genuinely separate from its expected output
-# (--inputdir/--outputdir both point at test/build, but pg_regress keeps
-# expected/ and results/ distinct there) -- test/install intentionally does
+# ($(TESTDIR)/build/expected/ vs $(TESTOUT)/build/results/, distinct even
+# when TESTOUT = TESTDIR) -- test/install intentionally does
 # NOT work this way (see test/install's own comments above): its actual
 # output lands on top of its expected file, so there's nothing to diff. We
 # don't generally care about test-build's own output content, but when a
@@ -753,7 +774,7 @@ endif
 # fails, the actual output results-build needs is already on disk. But
 # test-build can also fail for reasons that leave nothing fresh to bless --
 # install broke, run-test-build.sh errored, pg_regress couldn't even
-# connect -- in which case test/build/results/*.out is stale leftovers from
+# connect -- in which case $(TESTOUT)/build/results/*.out is stale leftovers from
 # whatever run last populated it, and blessing it would silently paper over
 # the real failure instead of surfacing it. We clear regression.diffs
 # beforehand and only treat a failure as "there's a diff to bless" if it
@@ -764,14 +785,14 @@ endif
 # below.
 .PHONY: results-build
 results-build:
-	@rm -f $(TESTDIR)/build/regression.diffs
-	$(MAKE) -C . test-build || test -s $(TESTDIR)/build/regression.diffs || { \
+	@rm -f $(TESTOUT)/build/regression.diffs
+	$(MAKE) -C . test-build || test -s $(TESTOUT)/build/regression.diffs || { \
 		echo "results-build: test-build failed for a reason other than a diff to bless; not blessing stale output" >&2; \
 		exit 1; \
 	}
 	@mkdir -p $(TESTDIR)/build/expected
 	@skipped=0; \
-	for f in $(TESTDIR)/build/results/*.out; do \
+	for f in $(TESTOUT)/build/results/*.out; do \
 		[ -f "$$f" ] || continue; \
 		if grep -q 'ERROR:' "$$f"; then \
 			echo "results-build: skipping $$f (actual output contains ERROR:)" >&2; \
