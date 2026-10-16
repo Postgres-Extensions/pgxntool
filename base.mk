@@ -299,11 +299,12 @@ _PGXNTOOL_CHECK_TEST_INSTALL_ERROR_STOP_SCRIPT ?= $(PGXNTOOL_DIR)/test/bin/check
 #   - Usage: Controls whether verify-results target exists and blocks make results
 #
 # Variable: PGXNTOOL_VERIFY_RESULTS_MODE
-#   - Controls how verify-results detects test failures
+#   - Controls how verify-results and `make test` detect test failures
 #   - Allowed values: "pgtap" or "diffs" (case-insensitive); anything else,
 #     including an empty value, is a parse-time error
-#   - "pgtap" (default): scans test/results/*.out for "not ok" lines and plan
-#     mismatches (TAP failures). Also checks regression.diffs as a fallback.
+#   - "pgtap" (default): runs verify-tap.sh on test/results/*.out to catch TAP
+#     failures (not ok, bad plans, Bail out!), even in output already blessed
+#     into an expected file. Also checks regression.diffs.
 #     Use this mode when your test suite uses pgTap.
 #   - "diffs": checks only for regression.diffs existence (classic pg_regress behavior)
 #     Use this mode when your tests use plain SQL expected-output comparison only.
@@ -513,7 +514,9 @@ endif
 endif
 
 # make test: run any test dependencies, then do a `make install installcheck`.
-# If regressions are found, it will output them.
+# Fails if regressions are found, printing them, or, in pgtap mode (see
+# PGXNTOOL_VERIFY_RESULTS_MODE), if verify-tap.sh rejects any TAP result file;
+# both checks always run so one failure can't hide the other.
 #
 # This used to depend on clean as well, but that causes problems with
 # watch-make if you're generating intermediate files. If tests end up needing
@@ -530,7 +533,15 @@ TEST_DEPS += install
 endif
 TEST_DEPS += installcheck
 test: $(TEST_DEPS)
+ifeq ($(PGXNTOOL_VERIFY_RESULTS_MODE),pgtap)
+	@status=0; \
+	set -- $(TESTOUT)/results/*.out; \
+	if [ -f "$$1" ]; then $(PGXNTOOL_DIR)/verify-tap.sh --skip-non-tap "$$@" || status=1; fi; \
+	if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; status=1; fi; \
+	exit $$status
+else
 	@if [ -r $(TESTOUT)/regression.diffs ]; then cat $(TESTOUT)/regression.diffs; exit 1; fi
+endif
 
 #
 # verify-results: Safeguard for make results
@@ -559,9 +570,9 @@ endif
 # DO NOT RUN THIS UNLESS YOU'RE CERTAIN ALL YOUR TESTS ARE PASSING!
 #
 # Depends on $(TEST_DEPS) directly rather than on `test` itself: `test`'s own
-# recipe now exits non-zero as soon as it sees a regression.diffs mismatch
-# (see `test:` above), which would abort this chain before verify-results ever
-# got a chance to inspect the diff and report it properly. verify-results (or
+# recipe exits non-zero on any test failure (see `test:` above), which would
+# abort this chain before verify-results ever got a chance to inspect the
+# diff and report it properly. verify-results (or
 # the plain diffs check below, when disabled) is the one that's supposed to
 # decide pass/fail here, not `test`.
 #

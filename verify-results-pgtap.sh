@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pgxntool/verify-results-pgtap.sh - Check pgtap results before 'make results'
 #
-# Scans pgtap output files for failures and plan mismatches, then checks
+# Runs verify-tap.sh --skip-non-tap on every result file, then checks
 # regression.diffs as a fallback, ignoring entries for tests that have no
 # expected output yet. Exits non-zero if any problems are found.
 #
@@ -13,25 +13,13 @@ set -e
 
 TESTOUT="${1:?Usage: verify-results-pgtap.sh TESTOUT}"
 
-# Check for pgtap failures in result files (excluding TODO items)
-failed=0
+# --skip-non-tap leaves plain-SQL tests to the regression.diffs check below.
+result_files=()
 for f in "$TESTOUT"/results/*.out; do
 	[ -f "$f" ] || continue
-	if grep -q '^not ok' "$f"; then
-		notok=$(grep '^not ok' "$f" | grep -v '# TODO' || true)
-		if [ -n "$notok" ]; then
-			echo "ERROR: pgtap failure detected in $f"
-			echo "$notok"
-			failed=1
-		fi
-	fi
-	if grep -q 'Looks like you planned' "$f"; then
-		echo "ERROR: pgtap plan mismatch in $f"
-		grep 'Looks like you planned' "$f"
-		failed=1
-	fi
+	result_files+=("$f")
 done
-if [ $failed -ne 0 ]; then
+if [ ${#result_files[@]} -gt 0 ] && ! "$(dirname "$0")/verify-tap.sh" --skip-non-tap "${result_files[@]}"; then
 	echo
 	echo "pgtap failures detected. Cannot run 'make results'."
 	exit 1
@@ -98,9 +86,9 @@ if [ -s "$diffs" ]; then
 		case $status in
 		unblessed)
 			# An unblessed file holding a hard SQL error is not a passing test
-			# the pgtap scan above was merely quiet about: ON_ERROR_STOP aborts
-			# the script, so pgtap emits neither 'not ok' nor its plan-mismatch
-			# line. Blessing that would make the error the baseline.
+			# just because verify-tap.sh was quiet about it: an error after the
+			# last planned test leaves the TAP intact, and a plain-SQL test has
+			# no TAP to check. Blessing that would make the error the baseline.
 			#
 			# pg_regress feeds psql on stdin, so a failing statement in the
 			# test file itself reports as "ERROR:  ..." at column 0, while one
